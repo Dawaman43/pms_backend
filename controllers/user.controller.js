@@ -14,7 +14,6 @@ const register = async (req, res, next) => {
     jobTitle,
     level,
     email,
-    department_id, // Expect department_id instead of department
     team, // team name
     phone,
     address,
@@ -55,30 +54,12 @@ const register = async (req, res, next) => {
     try {
       team_id = await getTeamId();
 
-      // Validate department_id
-      if (department_id) {
-        const deptResults = await new Promise((resolve, reject) => {
-          db.query(
-            "SELECT id FROM departments WHERE id = ?",
-            [department_id],
-            (err, results) => {
-              if (err) return reject(new Error("Error finding department"));
-              resolve(results);
-            }
-          );
-        });
-        if (deptResults.length === 0) {
-          return next(new Error("Invalid department_id"));
-        }
-      }
-
       const userData = {
         name,
         jobTitle,
         level,
         email,
         password: bcrypt.hashSync(password, 8),
-        department_id: department_id || null,
         team_id,
         phone,
         address,
@@ -104,15 +85,13 @@ const register = async (req, res, next) => {
   });
 };
 
-// ================= GET ALL USERS =================
 const getAllUsers = (req, res, next) => {
-  const { department, role } = req.query;
+  const { role } = req.query;
 
   let query = `
-    SELECT u.*, t.name AS teamName, d.name AS departmentName
+    SELECT u.*, t.name AS teamName
     FROM users u
     LEFT JOIN teams t ON u.team_id = t.id
-    LEFT JOIN departments d ON u.department_id = d.id
     WHERE 1=1
   `;
   const params = [];
@@ -121,11 +100,6 @@ const getAllUsers = (req, res, next) => {
   if (req.userRole === "staff") {
     query += " AND u.team_id = (SELECT team_id FROM users WHERE id = ?)";
     params.push(req.userId);
-  }
-
-  if (department) {
-    query += " AND d.name = ?";
-    params.push(department);
   }
 
   if (role) {
@@ -150,10 +124,9 @@ const getUserById = (req, res, next) => {
   }
 
   const query = `
-    SELECT u.*, t.name AS teamName, d.name AS departmentName
+    SELECT u.*, t.name AS teamName
     FROM users u
     LEFT JOIN teams t ON u.team_id = t.id
-    LEFT JOIN departments d ON u.department_id = d.id
     WHERE u.id = ?
     LIMIT 1
   `;
@@ -179,7 +152,6 @@ const updateUser = (req, res, next) => {
     jobTitle,
     level,
     email,
-    department,
     team_id,
     phone,
     address,
@@ -195,7 +167,6 @@ const updateUser = (req, res, next) => {
   if (jobTitle) userData.jobTitle = jobTitle;
   if (level) userData.level = level;
   if (email) userData.email = email;
-  if (department !== undefined) userData.department = department || null;
   if (team_id !== undefined) {
     const tid = parseInt(team_id);
     userData.team_id = !isNaN(tid) ? tid : null;
@@ -237,8 +208,8 @@ const updatePassword = (req, res, next) => {
   }
 
   const { oldPassword, newPassword } = req.body;
-  if (!oldPassword || !newPassword) {
-    return res.status(400).json({ error: "Old and new password are required" });
+  if (!newPassword) {
+    return res.status(400).json({ error: "New password is required" });
   }
 
   if (newPassword.length < 8) {
@@ -247,10 +218,32 @@ const updatePassword = (req, res, next) => {
       .json({ error: "New password must be at least 8 characters long" });
   }
 
-  User.updatePassword(userId, oldPassword, newPassword, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    res.json({ message: "Password updated successfully" });
-  });
+  // For admin/team_manager updating other users' passwords, oldPassword is not required
+  if (
+    ["admin", "team_manager"].includes(req.userRole) &&
+    req.userId !== userId
+  ) {
+    const hashedPassword = bcrypt.hashSync(newPassword, 8);
+    db.query(
+      "UPDATE users SET password = ? WHERE id = ?",
+      [hashedPassword, userId],
+      (err) => {
+        if (err)
+          return res.status(500).json({ error: "Error updating password" });
+        res.json({ message: "Password updated successfully" });
+      }
+    );
+  } else {
+    // For users updating their own password, verify old password
+    if (!oldPassword) {
+      return res.status(400).json({ error: "Old password is required" });
+    }
+
+    User.updatePassword(userId, oldPassword, newPassword, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      res.json({ message: "Password updated successfully" });
+    });
+  }
 };
 
 // ================= DELETE USER =================
