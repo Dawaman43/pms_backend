@@ -1,6 +1,7 @@
 const Evaluation = require("../models/evaluation.model");
 const EvaluationForm = require("../models/evaluationForm.model");
 
+// ---------------------- Submit Evaluation ----------------------
 const submitEvaluation = async (req, res, next) => {
   try {
     if (!["staff", "team_leader"].includes(req.userRole)) {
@@ -17,6 +18,7 @@ const submitEvaluation = async (req, res, next) => {
       });
     }
 
+    // Convert scores to JSON string for DB insert
     let scoresJSON;
     try {
       scoresJSON = JSON.stringify(scores);
@@ -63,6 +65,7 @@ const submitEvaluation = async (req, res, next) => {
   }
 };
 
+// ---------------------- Get Evaluations By User ----------------------
 const getEvaluationsByUser = (req, res, next) => {
   try {
     const requestedUserId = parseInt(req.params.userId);
@@ -80,9 +83,10 @@ const getEvaluationsByUser = (req, res, next) => {
         return next(new Error("Error fetching evaluations"));
       }
 
+      // No JSON.parse needed, scores already objects
       const evaluations = results.map((evaluation) => ({
         ...evaluation,
-        scores: evaluation.scores ? JSON.parse(evaluation.scores) : {},
+        scores: evaluation.scores || {},
       }));
 
       res.json(evaluations);
@@ -92,6 +96,7 @@ const getEvaluationsByUser = (req, res, next) => {
   }
 };
 
+// ---------------------- Get Evaluation By ID ----------------------
 const getEvaluationById = (req, res, next) => {
   try {
     if (
@@ -109,7 +114,7 @@ const getEvaluationById = (req, res, next) => {
 
       const evaluation = {
         ...results[0],
-        scores: results[0].scores ? JSON.parse(results[0].scores) : {},
+        scores: results[0].scores || {}, // already parsed
       };
 
       res.json(evaluation);
@@ -119,6 +124,7 @@ const getEvaluationById = (req, res, next) => {
   }
 };
 
+// ---------------------- Update Evaluation ----------------------
 const updateEvaluation = (req, res, next) => {
   try {
     if (!["team_manager", "admin"].includes(req.userRole)) {
@@ -131,6 +137,7 @@ const updateEvaluation = (req, res, next) => {
     if (evaluationData.scores) {
       evaluationData.scores = JSON.stringify(evaluationData.scores);
     }
+
     Evaluation.update(req.params.id, evaluationData, (err) => {
       if (err) {
         return res.status(500).json({ message: "Error updating evaluation" });
@@ -142,6 +149,7 @@ const updateEvaluation = (req, res, next) => {
   }
 };
 
+// ---------------------- Get All Evaluations ----------------------
 const getAllEvaluations = (req, res, next) => {
   try {
     if (
@@ -159,7 +167,7 @@ const getAllEvaluations = (req, res, next) => {
 
       const evaluations = results.map((evaluation) => ({
         ...evaluation,
-        scores: evaluation.scores ? JSON.parse(evaluation.scores) : {},
+        scores: evaluation.scores || {},
       }));
 
       res.json(evaluations);
