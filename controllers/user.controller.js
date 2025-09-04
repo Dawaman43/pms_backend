@@ -13,7 +13,8 @@ const register = (req, res, next) => {
     jobTitle,
     level,
     email,
-    team, // team name
+    team, // team name (optional)
+    department_id, // ✅ added
     phone,
     address,
     emergencyContact,
@@ -32,7 +33,7 @@ const register = (req, res, next) => {
     if (err) return next(new Error("Error checking email"));
     if (results.length > 0) return next(new Error("Email already exists"));
 
-    // Lookup team by name
+    // Lookup team by name (optional)
     const getTeamId = (cb) => {
       if (!team) return cb(null, null);
       db.query(
@@ -56,6 +57,7 @@ const register = (req, res, next) => {
         email,
         password: bcrypt.hashSync(password, 8),
         team_id,
+        department_id: department_id ? parseInt(department_id) : null, // ✅ FIXED
         phone,
         address,
         emergencyContact,
