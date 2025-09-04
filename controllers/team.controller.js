@@ -263,7 +263,6 @@ const getTeamMembersByUserId = (req, res, next) => {
 const getMyTeamMembers = (req, res, next) => {
   const userId = req.userId; // logged-in user
 
-  // Find the team of the logged-in user
   db.query(
     "SELECT team_id FROM users WHERE id = ?",
     [userId],
@@ -278,7 +277,6 @@ const getMyTeamMembers = (req, res, next) => {
 
       const teamId = result[0].team_id;
 
-      // Fetch all team members except the logged-in user, including department
       db.query(
         `SELECT u.id, u.name, u.email, u.jobTitle, d.name AS department_name
          FROM users u
@@ -302,6 +300,60 @@ const getMyTeamMembers = (req, res, next) => {
   );
 };
 
+// ================= GET TEAM MEMBERS (Leader/Admin only) =================
+const getTeamMembers = (req, res, next) => {
+  const userId = req.userId; // logged-in user
+
+  if (!["admin", "team_leader"].includes(req.userRole)) {
+    return res.status(403).json({ message: "Not authorized to view members" });
+  }
+
+  // Get team(s) where the logged-in user is the leader
+  const teamQuery = `
+    SELECT id AS team_id
+    FROM teams
+    WHERE leader_id = ?
+  `;
+
+  db.query(teamQuery, [userId], (err, result) => {
+    if (err)
+      return res.status(500).json({ message: "Error fetching user team" });
+    if (!result.length) {
+      return res
+        .status(404)
+        .json({ message: "You are not assigned as a team leader" });
+    }
+
+    const teamIds = result.map((t) => t.team_id);
+
+    // Fetch all users assigned to the leader's team(s)
+    const membersQuery = `
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.jobTitle,
+        d.name AS department_name,
+        u.profileImage,
+        CONCAT('ASTU-ICT-', LPAD(u.id, 3, '0')) AS employeeId
+      FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
+      WHERE u.team_id IN (?)
+    `;
+
+    db.query(membersQuery, [teamIds], (err2, members) => {
+      if (err2)
+        return res.status(500).json({ message: "Error fetching team members" });
+
+      res.json({
+        teamIds,
+        members,
+        membersCount: members.length,
+      });
+    });
+  });
+};
+
 module.exports = {
   createTeam,
   getAllTeams,
@@ -310,4 +362,5 @@ module.exports = {
   deleteTeam,
   getTeamMembersByUserId,
   getMyTeamMembers,
+  getTeamMembers,
 };
