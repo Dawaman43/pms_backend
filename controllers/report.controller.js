@@ -9,14 +9,17 @@ const generatePerformanceReport = (req, res, next) => {
   }
 
   Report.generatePerformanceReport((err, results) => {
-    if (err) return next(new Error("Error generating report"));
+    if (err) {
+      console.error("💥 Performance report SQL error:", err);
+      return res.status(500).json({ message: err.sqlMessage || err.message });
+    }
 
     const reports = results.map((r) => ({
       employeeId: r.employeeId,
       employeeName: r.employeeName,
       jobTitle: r.jobTitle,
-      department: r.department,
-      totalEvaluations: r.totalEvaluations,
+      department: r.department || "N/A",
+      totalEvaluations: r.totalEvaluations || 0,
       peerScores: r.peerScores || [],
       selfScores: r.selfScores || [],
     }));
@@ -29,6 +32,10 @@ const generatePerformanceReport = (req, res, next) => {
 const generateEmployeeReport = (req, res, next) => {
   const employeeId = req.params.id;
 
+  if (!employeeId) {
+    return res.status(400).json({ message: "Employee ID required" });
+  }
+
   // Staff can only access their own report
   if (req.userRole === "staff" && req.userId != employeeId) {
     return res
@@ -37,7 +44,10 @@ const generateEmployeeReport = (req, res, next) => {
   }
 
   Report.generateEmployeeReport(employeeId, (err, results) => {
-    if (err) return next(new Error("Error generating employee report"));
+    if (err) {
+      console.error(`💥 Employee report SQL error for ID ${employeeId}:`, err);
+      return res.status(500).json({ message: err.sqlMessage || err.message });
+    }
 
     if (!results || results.length === 0) {
       return res.status(404).json({ message: "Employee not found" });
@@ -50,8 +60,8 @@ const generateEmployeeReport = (req, res, next) => {
         employeeId: employee.employeeId,
         employeeName: employee.employeeName,
         jobTitle: employee.jobTitle,
-        department: employee.department,
-        totalEvaluations: employee.totalEvaluations,
+        department: employee.department || "N/A",
+        totalEvaluations: employee.totalEvaluations || 0,
         peerScores: employee.peerScores || [],
         selfScores: employee.selfScores || [],
       },

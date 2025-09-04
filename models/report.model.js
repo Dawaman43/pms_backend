@@ -7,7 +7,7 @@ const Report = {
         u.id AS employeeId,
         u.name AS employeeName,
         u.jobTitle,
-        u.department,
+        d.name AS department,
         COALESCE((
           SELECT JSON_ARRAYAGG(e.score)
           FROM evaluations e
@@ -26,6 +26,7 @@ const Report = {
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
       ORDER BY u.name ASC;
     `;
     db.query(query, callback);
@@ -37,7 +38,7 @@ const Report = {
         u.id AS employeeId,
         u.name AS employeeName,
         u.jobTitle,
-        u.department,
+        d.name AS department,
         COALESCE((
           SELECT JSON_ARRAYAGG(e.score)
           FROM evaluations e
@@ -56,7 +57,8 @@ const Report = {
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
-      WHERE u.id = ?
+      LEFT JOIN departments d ON u.department_id = d.id
+      WHERE u.id = ?;
     `;
     db.query(query, [employeeId], callback);
   },
