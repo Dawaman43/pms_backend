@@ -7,13 +7,14 @@ const {
   updateUser,
   deleteUser,
   updatePassword,
+  getAllUsersExceptCurrent,
 } = require("../controllers/user.controller");
 
 const {
   verifyToken,
   isAdmin,
-  isTeamManager,
-  isAdminOrTeamManager,
+  isTeamLeader,
+  isAdminOrTeamLeader,
 } = require("../middlewares/auth.middleware");
 
 const User = require("../models/user.model");
@@ -30,11 +31,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+router.get("/all-except-current", verifyToken, getAllUsersExceptCurrent);
+
 // Create user: admin or team_manager
-router.post("/", verifyToken, isAdminOrTeamManager, register);
+router.post("/", verifyToken, isAdminOrTeamLeader, register);
 
 // Get all users: admin or team_manager
-router.get("/", verifyToken, isAdminOrTeamManager, getAllUsers);
+router.get("/", verifyToken, isAdminOrTeamLeader, getAllUsers);
 
 // Get single user: any authenticated user
 router.get("/:id", verifyToken, getUserById);

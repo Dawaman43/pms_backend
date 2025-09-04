@@ -1,11 +1,10 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/user.model");
-const Team = require("../models/team.model");
 const db = require("../configs/db.config");
 
 // ================= REGISTER USER =================
-const register = async (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+const register = (req, res, next) => {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to create users" });
   }
 
@@ -28,31 +27,27 @@ const register = async (req, res, next) => {
     return next(new Error("Name, email, and password are required"));
   }
 
-  // Check if email already exists
-  User.findByEmail(email, async (err, results) => {
+  // Check if email exists
+  User.findByEmail(email, (err, results) => {
     if (err) return next(new Error("Error checking email"));
     if (results.length > 0) return next(new Error("Email already exists"));
 
-    let team_id = null;
-
     // Lookup team by name
-    const getTeamId = () => {
-      return new Promise((resolve, reject) => {
-        if (!team) return resolve(null);
-        db.query(
-          "SELECT id FROM teams WHERE name = ?",
-          [team],
-          (err, teamResults) => {
-            if (err) return reject(new Error("Error finding team"));
-            if (teamResults.length > 0) resolve(teamResults[0].id);
-            else resolve(null);
-          }
-        );
-      });
+    const getTeamId = (cb) => {
+      if (!team) return cb(null, null);
+      db.query(
+        "SELECT id FROM teams WHERE name = ?",
+        [team],
+        (err, teamResults) => {
+          if (err) return cb(new Error("Error finding team"));
+          if (teamResults.length > 0) return cb(null, teamResults[0].id);
+          return cb(null, null);
+        }
+      );
     };
 
-    try {
-      team_id = await getTeamId();
+    getTeamId((err, team_id) => {
+      if (err) return next(err);
 
       const userData = {
         name,
@@ -79,12 +74,11 @@ const register = async (req, res, next) => {
           userId: result.insertId,
         });
       });
-    } catch (error) {
-      return next(error);
-    }
+    });
   });
 };
 
+// ================= GET ALL USERS =================
 const getAllUsers = (req, res, next) => {
   const { role } = req.query;
 
@@ -96,7 +90,6 @@ const getAllUsers = (req, res, next) => {
   `;
   const params = [];
 
-  // Staff can only see their own team
   if (req.userRole === "staff") {
     query += " AND u.team_id = (SELECT team_id FROM users WHERE id = ?)";
     params.push(req.userId);
@@ -179,7 +172,7 @@ const updateUser = (req, res, next) => {
     userData.salary = !isNaN(parseFloat(salary)) ? parseFloat(salary) : null;
   if (profileImage !== undefined) userData.profileImage = profileImage || null;
 
-  if (["admin", "team_manager"].includes(req.userRole)) {
+  if (["admin", "team_leader"].includes(req.userRole)) {
     if (role) userData.role = role;
     if (status) userData.status = status;
   }
@@ -200,7 +193,7 @@ const updatePassword = (req, res, next) => {
 
   if (
     req.userId !== userId &&
-    !["admin", "team_manager"].includes(req.userRole)
+    !["admin", "team_leader"].includes(req.userRole)
   ) {
     return res
       .status(403)
@@ -208,19 +201,15 @@ const updatePassword = (req, res, next) => {
   }
 
   const { oldPassword, newPassword } = req.body;
-  if (!newPassword) {
+  if (!newPassword)
     return res.status(400).json({ error: "New password is required" });
-  }
-
-  if (newPassword.length < 8) {
+  if (newPassword.length < 8)
     return res
       .status(400)
       .json({ error: "New password must be at least 8 characters long" });
-  }
 
-  // For admin/team_manager updating other users' passwords, oldPassword is not required
   if (
-    ["admin", "team_manager"].includes(req.userRole) &&
+    ["admin", "team_leader"].includes(req.userRole) &&
     req.userId !== userId
   ) {
     const hashedPassword = bcrypt.hashSync(newPassword, 8);
@@ -234,11 +223,8 @@ const updatePassword = (req, res, next) => {
       }
     );
   } else {
-    // For users updating their own password, verify old password
-    if (!oldPassword) {
+    if (!oldPassword)
       return res.status(400).json({ error: "Old password is required" });
-    }
-
     User.updatePassword(userId, oldPassword, newPassword, (err) => {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ message: "Password updated successfully" });
@@ -248,7 +234,7 @@ const updatePassword = (req, res, next) => {
 
 // ================= DELETE USER =================
 const deleteUser = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to delete users" });
   }
 
@@ -259,6 +245,37 @@ const deleteUser = (req, res, next) => {
   });
 };
 
+// ================= GET ALL USERS EXCEPT CURRENT =================
+const getAllUsersExceptCurrent = (req, res) => {
+  db.query(
+    "SELECT team_id FROM users WHERE id = ?",
+    [req.userId],
+    (err, userResults) => {
+      if (err) {
+        console.error("Error fetching user's team:", err);
+        return res.status(500).json({ message: "Error fetching user's team" });
+      }
+
+      const teamId = userResults[0]?.team_id;
+      if (!teamId) return res.json([]);
+
+      db.query(
+        "SELECT id, name, role FROM users WHERE team_id = ? AND id != ? AND status = 'active'",
+        [teamId, req.userId],
+        (err, results) => {
+          if (err) {
+            console.error("Error fetching team peers:", err);
+            return res
+              .status(500)
+              .json({ message: "Error fetching team peers" });
+          }
+          res.json(results || []);
+        }
+      );
+    }
+  );
+};
+
 module.exports = {
   register,
   getAllUsers,
@@ -266,4 +283,5 @@ module.exports = {
   updateUser,
   updatePassword,
   deleteUser,
+  getAllUsersExceptCurrent,
 };

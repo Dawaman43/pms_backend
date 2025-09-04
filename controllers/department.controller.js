@@ -1,3 +1,5 @@
+const db = require("../configs/db.config");
+
 const Department = require("../models/department.model");
 
 // Create department (Admin only)
@@ -79,10 +81,56 @@ const deleteDepartment = (req, res, next) => {
   });
 };
 
+const getTeamLeadersByDepartment = (req, res, next) => {
+  if (req.userRole !== "admin") {
+    return res
+      .status(403)
+      .json({ message: "Admins only can view team leaders" });
+  }
+
+  const departmentId = parseInt(req.params.id);
+
+  const query = `
+    SELECT id, name, email, role
+    FROM users
+    WHERE department_id = ? AND role = 'team_leader'
+  `;
+
+  db.query(query, [departmentId], (err, results) => {
+    if (err) {
+      console.error("SQL ERROR in getTeamLeadersByDepartment:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+    res.json(results);
+  });
+};
+
+// In department.controller.js
+const getStaffByDepartment = (req, res, next) => {
+  if (req.userRole !== "admin") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const departmentId = parseInt(req.params.id);
+
+  const query = `
+    SELECT id, name, email, role
+    FROM users
+    WHERE department_id = ? AND role = 'staff'
+  `;
+
+  db.query(query, [departmentId], (err, results) => {
+    if (err) return res.status(500).json({ message: "Internal server error" });
+    res.json(results);
+  });
+};
+
 module.exports = {
   createDepartment,
   getAllDepartments,
   getDepartmentById,
   updateDepartment,
   deleteDepartment,
+  getTeamLeadersByDepartment,
+  getStaffByDepartment,
 };

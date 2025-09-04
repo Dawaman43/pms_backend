@@ -13,6 +13,10 @@ const Evaluation = {
     db.query("SELECT * FROM evaluations WHERE id = ?", [id], callback);
   },
 
+  findAll: (callback) => {
+    db.query("SELECT * FROM evaluations", callback);
+  },
+
   update: (id, evaluationData, callback) => {
     db.query(
       "UPDATE evaluations SET ? WHERE id = ?",

@@ -1,8 +1,8 @@
 const Report = require("../models/report.model");
 
-// Generate full performance report (admin / team_manager only)
+// Generate full performance report (admin / team leader only)
 const generatePerformanceReport = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res
       .status(403)
       .json({ message: "Not authorized to generate full report" });

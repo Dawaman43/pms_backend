@@ -1,7 +1,9 @@
-const EvaluationForm = require("../models/evaluationForm.model");
+const db = require("../configs/db.config");
 
+// ==================== UTILITIES ====================
 const safeParseJSON = (value, defaultValue = []) => {
   if (!value) return defaultValue;
+  if (Buffer.isBuffer(value)) value = value.toString("utf8");
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
@@ -13,118 +15,207 @@ const safeParseJSON = (value, defaultValue = []) => {
   return Array.isArray(value) ? value : defaultValue;
 };
 
-// Create a new form
-const createForm = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
-    return res.status(403).json({ message: "Not authorized to create forms" });
-  }
-
-  const {
-    title,
-    description,
-    formType,
-    targetEvaluator,
-    weight,
-    sections,
-    ratingScale,
-  } = req.body;
-
-  if (!title || !formType || !targetEvaluator || !weight || !sections) {
-    return res
-      .status(400)
-      .json({ message: "All required fields must be provided" });
-  }
-
-  const formData = {
-    title,
-    description: description || "",
-    formType,
-    targetEvaluator,
-    weight,
-    sections: JSON.stringify(sections),
-    ratingScale: ratingScale ? JSON.stringify(ratingScale) : JSON.stringify([]),
-    created_by: req.userId,
-    lastModified: new Date().toISOString().split("T")[0],
-    status: "active",
-    usageCount: 0,
-  };
-
-  EvaluationForm.create(formData, (err, result) => {
-    if (err) return next(new Error("Error creating form"));
-    res.json({ message: "Form created successfully", formId: result.insertId });
+// ==================== PROMISIFIED QUERY ====================
+const queryAsync = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.query(sql, params, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
   });
+
+// ==================== CREATE FORM ====================
+const createForm = async (req, res) => {
+  try {
+    if (!["admin", "team_manager"].includes(req.userRole))
+      return res
+        .status(403)
+        .json({ message: "Not authorized to create forms" });
+
+    const {
+      title,
+      description = "",
+      formType,
+      targetEvaluator,
+      weight,
+      sections,
+      ratingScale,
+      team_id = null,
+    } = req.body;
+    const finalTeamId = formType === "peer_evaluation" ? null : team_id;
+
+    if (!title || !formType || !targetEvaluator || !weight || !sections)
+      return res
+        .status(400)
+        .json({ message: "All required fields must be provided" });
+    if (isNaN(parseInt(weight, 10)))
+      return res.status(400).json({ message: "Weight must be a number" });
+
+    const sql = `
+      INSERT INTO evaluation_forms
+      (title, description, formType, targetEvaluator, weight, sections, ratingScale, team_id, created_by, lastModified, status, usageCount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)
+    `;
+    const params = [
+      title,
+      description,
+      formType,
+      targetEvaluator,
+      parseInt(weight, 10),
+      JSON.stringify(sections),
+      JSON.stringify(ratingScale || []),
+      finalTeamId,
+      req.userId,
+      new Date().toISOString().split("T")[0],
+    ];
+
+    const result = await queryAsync(sql, params);
+    res
+      .status(201)
+      .json({ message: "Form created successfully", formId: result.insertId });
+  } catch (err) {
+    console.error("Error creating form:", err);
+    res.status(500).json({ message: err.message || "Error creating form" });
+  }
 };
 
-// Get all forms (anyone can view)
-const getAllForms = (req, res, next) => {
-  EvaluationForm.findAll((err, results) => {
-    if (err) return next(new Error("Error fetching forms"));
-
-    const forms = results.map((form) => ({
-      ...form,
-      sections: safeParseJSON(form.sections),
-      ratingScale: safeParseJSON(form.ratingScale),
+// ==================== GET ALL FORMS ====================
+const getAllForms = async (req, res) => {
+  try {
+    const sql = "SELECT * FROM evaluation_forms WHERE status = 'active'";
+    const results = await queryAsync(sql);
+    const forms = results.map((f) => ({
+      ...f,
+      sections: safeParseJSON(f.sections),
+      ratingScale: safeParseJSON(f.ratingScale),
     }));
-
     res.json(forms);
-  });
+  } catch (err) {
+    console.error("Error fetching forms:", err);
+    res.status(500).json({ message: err.message || "Error fetching forms" });
+  }
 };
 
-// Get a single form by ID
-const getFormById = (req, res, next) => {
-  EvaluationForm.findById(req.params.id, (err, results) => {
-    if (err) return next(new Error("Error fetching form"));
-    if (!results || results.length === 0) {
+// ==================== GET FORM BY ID ====================
+const getFormById = async (req, res) => {
+  try {
+    const sql =
+      "SELECT * FROM evaluation_forms WHERE id = ? AND status = 'active'";
+    const results = await queryAsync(sql, [req.params.id]);
+    if (!results.length)
       return res.status(404).json({ message: "Form not found" });
-    }
 
     const form = {
       ...results[0],
       sections: safeParseJSON(results[0].sections),
       ratingScale: safeParseJSON(results[0].ratingScale),
     };
-
     res.json(form);
-  });
+  } catch (err) {
+    console.error("Error fetching form by ID:", err);
+    res.status(500).json({ message: err.message || "Error fetching form" });
+  }
 };
 
-// Update a form (only admin / manager who created it)
-const updateForm = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
-    return res.status(403).json({ message: "Not authorized to update forms" });
+// ==================== GET FORMS BY TEAM ID ====================
+const getFormsByTeamId = async (req, res) => {
+  const numericTeamId = parseInt(req.params.teamId, 10);
+  if (isNaN(numericTeamId))
+    return res.status(400).json({ message: "Invalid team ID" });
+
+  try {
+    const sql =
+      "SELECT * FROM evaluation_forms WHERE (team_id IS NULL OR team_id = ?) AND status = 'active'";
+    const results = await queryAsync(sql, [numericTeamId]);
+    const forms = results.map((f) => ({
+      ...f,
+      sections: safeParseJSON(f.sections),
+      ratingScale: safeParseJSON(f.ratingScale),
+    }));
+    res.json(forms);
+  } catch (err) {
+    console.error("Error fetching forms by team ID:", err);
+    res.status(500).json({ message: err.message || "Error fetching forms" });
   }
+};
 
-  const formData = {
-    ...req.body,
-    lastModified: new Date().toISOString().split("T")[0],
-  };
+// ==================== UPDATE FORM ====================
+const updateForm = async (req, res) => {
+  try {
+    if (!["admin", "team_manager"].includes(req.userRole))
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update forms" });
 
-  if (formData.sections) formData.sections = JSON.stringify(formData.sections);
-  if (formData.ratingScale)
-    formData.ratingScale = JSON.stringify(formData.ratingScale);
+    const { sections, ratingScale, ...rest } = req.body;
+    const updateFields = {
+      ...rest,
+      lastModified: new Date().toISOString().split("T")[0],
+    };
+    if (sections) updateFields.sections = JSON.stringify(sections);
+    if (ratingScale) updateFields.ratingScale = JSON.stringify(ratingScale);
 
-  EvaluationForm.update(req.params.id, formData, (err) => {
-    if (err) return next(new Error("Error updating form"));
+    const setClause = Object.keys(updateFields)
+      .map((key) => `${key} = ?`)
+      .join(", ");
+    const values = Object.values(updateFields);
+
+    const sql = `UPDATE evaluation_forms SET ${setClause} WHERE id = ?`;
+    const result = await queryAsync(sql, [...values, req.params.id]);
+    if (result.affectedRows === 0)
+      return res.status(404).json({ message: "Form not found" });
+
     res.json({ message: "Form updated successfully" });
-  });
+  } catch (err) {
+    console.error("Error updating form:", err);
+    res.status(500).json({ message: err.message || "Error updating form" });
+  }
 };
 
-// Delete a form (only admin / manager)
-const deleteForm = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
-    return res.status(403).json({ message: "Not authorized to delete forms" });
-  }
+// ==================== DELETE FORM ====================
+const deleteForm = async (req, res) => {
+  try {
+    if (!["admin", "team_manager"].includes(req.userRole))
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete forms" });
 
-  EvaluationForm.delete(req.params.id, (err) => {
-    if (err) return next(new Error("Error deleting form"));
-    res.json({ message: "Form deleted successfully" });
-  });
+    const sql = "UPDATE evaluation_forms SET status = 'inactive' WHERE id = ?";
+    const result = await queryAsync(sql, [req.params.id]);
+    if (result.affectedRows === 0)
+      return res.status(404).json({ message: "Form not found" });
+
+    res.json({ message: "Form deleted successfully (soft delete)" });
+  } catch (err) {
+    console.error("Error deleting form:", err);
+    res.status(500).json({ message: err.message || "Error deleting form" });
+  }
+};
+
+// ==================== GET ALL PEER EVALUATION FORMS ====================
+const getAllPeerEvaluationForms = async (req, res) => {
+  try {
+    const sql =
+      "SELECT * FROM evaluation_forms WHERE formType = 'peer_evaluation' AND status = 'active'";
+    const results = await queryAsync(sql);
+    const forms = results.map((f) => ({
+      ...f,
+      sections: safeParseJSON(f.sections),
+      ratingScale: safeParseJSON(f.ratingScale),
+    }));
+    res.json(forms);
+  } catch (err) {
+    console.error("Error fetching peer evaluation forms:", err);
+    res.status(500).json({ message: "Failed to fetch peer evaluation forms" });
+  }
 };
 
 module.exports = {
   createForm,
   getAllForms,
   getFormById,
+  getFormsByTeamId,
   updateForm,
   deleteForm,
+  getAllPeerEvaluationForms,
 };

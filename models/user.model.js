@@ -36,15 +36,15 @@ const User = {
     db.query(query, [id], callback);
   },
 
-  // Find all team managers
-  findManagers: (callback) => {
-    db.query("SELECT * FROM users WHERE role = 'team_manager'", callback);
+  // Find all team leaders
+  findLeaders: (callback) => {
+    db.query("SELECT * FROM users WHERE role = 'team_leader'", callback);
   },
 
-  // Find team manager by team ID
-  findManagersByTeamId: (teamId, callback) => {
+  // Find team leader by team ID
+  findLeadersByTeamId: (teamId, callback) => {
     db.query(
-      "SELECT * FROM users WHERE role = 'team_manager' AND team_id = ?",
+      "SELECT * FROM users WHERE role = 'team_leader' AND team_id = ?",
       [teamId],
       callback
     );

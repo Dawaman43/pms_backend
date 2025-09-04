@@ -14,13 +14,15 @@ const EvaluationForm = {
   },
 
   findByTeamId: (teamId, callback) => {
-    db.query(
-      "SELECT * FROM evaluation_forms WHERE team_id = ?",
-      [teamId],
-      callback
-    );
-  },
+    // Ensure teamId is numeric
+    const numericTeamId = parseInt(teamId, 10);
+    if (isNaN(numericTeamId)) {
+      return callback(new Error("Invalid team ID"));
+    }
 
+    const sql = "SELECT * FROM evaluation_forms WHERE team_id = ?";
+    db.query(sql, [numericTeamId], callback);
+  },
   update: (id, formData, callback) => {
     db.query(
       "UPDATE evaluation_forms SET ? WHERE id = ?",

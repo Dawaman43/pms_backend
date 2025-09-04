@@ -12,42 +12,28 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// Admin only
 const isAdmin = (req, res, next) => {
   if (req.userRole !== "admin")
-    return res.status(403).json({ message: "Access denied: Admins only" });
+    return res.status(403).json({ message: "Admins only" });
   next();
 };
 
-// Staff only
-const isStaff = (req, res, next) => {
-  if (req.userRole !== "staff")
-    return res.status(403).json({ message: "Access denied: Staff only" });
+const isTeamLeader = (req, res, next) => {
+  if (req.userRole !== "team_leader")
+    return res.status(403).json({ message: "Team Leaders only" });
   next();
 };
 
-// Team Manager only
-const isTeamManager = (req, res, next) => {
-  if (req.userRole !== "team_manager")
-    return res
-      .status(403)
-      .json({ message: "Access denied: Team Managers only" });
-  next();
-};
-
-// Admin or Team Manager
-const isAdminOrTeamManager = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole))
-    return res
-      .status(403)
-      .json({ message: "Access denied: Admin or Team Manager only" });
+const isAdminOrTeamLeader = (req, res, next) => {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
+    return res.status(403).json({ message: "Admins or Team Leaders only" });
+  }
   next();
 };
 
 module.exports = {
   verifyToken,
   isAdmin,
-  isStaff,
-  isTeamManager,
-  isAdminOrTeamManager,
+  isTeamLeader,
+  isAdminOrTeamLeader,
 };

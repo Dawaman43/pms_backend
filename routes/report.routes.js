@@ -7,22 +7,21 @@ const {
 const {
   verifyToken,
   isAdmin,
-  isStaff,
-  isTeamManager,
-  isAdminOrTeamManager,
+  isTeamLeader,
+  isAdminOrTeamLeader,
 } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
-// Performance report: admin or team manager
+// Performance report: admin or team leader
 router.get(
   "/performance",
   verifyToken,
-  isAdminOrTeamManager,
+  isAdminOrTeamLeader,
   generatePerformanceReport
 );
 
-// Employee report: staff or manager for their team members
+// Employee report: staff or leader (for their team members)
 router.get("/employee/:id", verifyToken, generateEmployeeReport);
 
 module.exports = router;

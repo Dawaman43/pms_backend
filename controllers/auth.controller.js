@@ -14,7 +14,6 @@ const login = (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
 
     const user = results[0];
-
     const isMatch = bcrypt.compareSync(password, user.password);
     if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
 
@@ -37,6 +36,4 @@ const login = (req, res, next) => {
   });
 };
 
-module.exports = {
-  login,
-};
+module.exports = { login };

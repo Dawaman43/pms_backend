@@ -10,15 +10,15 @@ const {
 
 const {
   verifyToken,
-  isAdminOrTeamManager,
+  isAdminOrTeamLeader,
 } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
-// --- Create, update, delete teams (admin or team manager) ---
-router.post("/", verifyToken, isAdminOrTeamManager, createTeam);
-router.put("/:id", verifyToken, isAdminOrTeamManager, updateTeam);
-router.delete("/:id", verifyToken, isAdminOrTeamManager, deleteTeam);
+// --- Create, update, delete teams (admin or team leader) ---
+router.post("/", verifyToken, isAdminOrTeamLeader, createTeam);
+router.put("/:id", verifyToken, isAdminOrTeamLeader, updateTeam);
+router.delete("/:id", verifyToken, isAdminOrTeamLeader, deleteTeam);
 
 // --- Get teams or members (any authenticated user) ---
 // Note: specific routes must come before generic ones

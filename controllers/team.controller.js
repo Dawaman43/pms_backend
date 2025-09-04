@@ -3,7 +3,7 @@ const db = require("../configs/db.config");
 
 // ================= CREATE TEAM =================
 const createTeam = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to create teams" });
   }
 
@@ -128,7 +128,7 @@ const getTeamById = (req, res, next) => {
 
 // ================= UPDATE TEAM =================
 const updateTeam = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to update teams" });
   }
 
@@ -204,7 +204,7 @@ const updateTeam = (req, res, next) => {
 
 // ================= DELETE TEAM =================
 const deleteTeam = (req, res, next) => {
-  if (!["admin", "team_manager"].includes(req.userRole)) {
+  if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to delete teams" });
   }
 

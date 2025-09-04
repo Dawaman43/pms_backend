@@ -65,13 +65,17 @@ const submitEvaluation = async (req, res, next) => {
 
 const getEvaluationsByUser = (req, res, next) => {
   try {
-    if (!["team_manager", "admin"].includes(req.userRole)) {
+    const requestedUserId = parseInt(req.params.userId);
+
+    if (
+      !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
+    ) {
       return res
         .status(403)
         .json({ message: "Not authorized to view evaluations" });
     }
 
-    Evaluation.findByUserId(req.params.userId, (err, results) => {
+    Evaluation.findByUserId(requestedUserId, (err, results) => {
       if (err) {
         return next(new Error("Error fetching evaluations"));
       }
@@ -90,7 +94,9 @@ const getEvaluationsByUser = (req, res, next) => {
 
 const getEvaluationById = (req, res, next) => {
   try {
-    if (!["team_manager", "admin"].includes(req.userRole)) {
+    if (
+      !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
+    ) {
       return res
         .status(403)
         .json({ message: "Not authorized to view evaluation" });
@@ -136,9 +142,37 @@ const updateEvaluation = (req, res, next) => {
   }
 };
 
+const getAllEvaluations = (req, res, next) => {
+  try {
+    if (
+      !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view evaluations" });
+    }
+
+    Evaluation.findAll((err, results) => {
+      if (err) {
+        return next(new Error("Error fetching evaluations"));
+      }
+
+      const evaluations = results.map((evaluation) => ({
+        ...evaluation,
+        scores: evaluation.scores ? JSON.parse(evaluation.scores) : {},
+      }));
+
+      res.json(evaluations);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   submitEvaluation,
   getEvaluationsByUser,
   getEvaluationById,
   updateEvaluation,
+  getAllEvaluations,
 };
