@@ -259,6 +259,46 @@ const getTeamMembersByUserId = (req, res, next) => {
   );
 };
 
+// ================= GET MY TEAM MEMBERS (PEERS) =================
+const getMyTeamMembers = (req, res, next) => {
+  const userId = req.userId; // logged-in user
+
+  // Find the team of the logged-in user
+  db.query(
+    "SELECT team_id FROM users WHERE id = ?",
+    [userId],
+    (err, result) => {
+      if (err)
+        return res.status(500).json({ message: "Error fetching user team" });
+      if (!result.length || !result[0].team_id) {
+        return res
+          .status(404)
+          .json({ message: "You are not assigned to any team" });
+      }
+
+      const teamId = result[0].team_id;
+
+      // Fetch all team members except the logged-in user
+      db.query(
+        "SELECT id, name, email, jobTitle FROM users WHERE team_id = ? AND id != ?",
+        [teamId, userId],
+        (err2, members) => {
+          if (err2)
+            return res
+              .status(500)
+              .json({ message: "Error fetching team members" });
+
+          res.json({
+            teamId,
+            peers: members,
+            peersCount: members.length,
+          });
+        }
+      );
+    }
+  );
+};
+
 module.exports = {
   createTeam,
   getAllTeams,
@@ -266,4 +306,5 @@ module.exports = {
   updateTeam,
   deleteTeam,
   getTeamMembersByUserId,
+  getMyTeamMembers,
 };

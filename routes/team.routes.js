@@ -6,6 +6,7 @@ const {
   updateTeam,
   deleteTeam,
   getTeamMembersByUserId,
+  getMyTeamMembers,
 } = require("../controllers/team.controller");
 
 const {
@@ -24,6 +25,7 @@ router.delete("/:id", verifyToken, isAdminOrTeamLeader, deleteTeam);
 // Note: specific routes must come before generic ones
 router.get("/", verifyToken, getAllTeams);
 router.get("/members/:userId", verifyToken, getTeamMembersByUserId);
+router.get("/my-team", verifyToken, getMyTeamMembers); // ✅ new route
 router.get("/:id", verifyToken, getTeamById);
 
 module.exports = router;
