@@ -278,9 +278,12 @@ const getMyTeamMembers = (req, res, next) => {
 
       const teamId = result[0].team_id;
 
-      // Fetch all team members except the logged-in user
+      // Fetch all team members except the logged-in user, including department
       db.query(
-        "SELECT id, name, email, jobTitle FROM users WHERE team_id = ? AND id != ?",
+        `SELECT u.id, u.name, u.email, u.jobTitle, d.name AS department_name
+         FROM users u
+         LEFT JOIN departments d ON u.department_id = d.id
+         WHERE u.team_id = ? AND u.id != ?`,
         [teamId, userId],
         (err2, members) => {
           if (err2)
