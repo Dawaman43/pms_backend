@@ -24,14 +24,7 @@ const createDepartment = (req, res, next) => {
   });
 };
 
-// Get all departments (Admins only)
 const getAllDepartments = (req, res, next) => {
-  if (req.userRole !== "admin") {
-    return res
-      .status(403)
-      .json({ message: "Admins only can view departments" });
-  }
-
   Department.findAll((err, results) => {
     if (err) return next(new Error("Error fetching departments"));
     res.json(results);
