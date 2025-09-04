@@ -26,3 +26,4 @@ Thumbs.db
 
 # Optional: local cache
 .vite/
+.env
