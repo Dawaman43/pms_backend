@@ -25,15 +25,12 @@ const login = (req, res, next) => {
 
     res.json({
       message: "Login successful",
-      user: {
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        email: user.email,
-      },
+      user: { id: user.id, name: user.name, role: user.role },
       token,
     });
   });
 };
 
-module.exports = { login };
+module.exports = {
+  login,
+};

@@ -85,18 +85,23 @@ const getAllUsers = (req, res, next) => {
   const { role } = req.query;
 
   let query = `
-    SELECT u.*, t.name AS teamName
+    SELECT u.*, 
+           t.name AS teamName, 
+           d.name AS department_name
     FROM users u
     LEFT JOIN teams t ON u.team_id = t.id
+    LEFT JOIN departments d ON u.department_id = d.id
     WHERE 1=1
   `;
   const params = [];
 
+  // If staff, restrict to same team
   if (req.userRole === "staff") {
     query += " AND u.team_id = (SELECT team_id FROM users WHERE id = ?)";
     params.push(req.userId);
   }
 
+  // Filter by role if provided
   if (role) {
     query += " AND u.role = ?";
     params.push(role);
@@ -119,9 +124,12 @@ const getUserById = (req, res, next) => {
   }
 
   const query = `
-    SELECT u.*, t.name AS teamName
+    SELECT u.*, 
+           t.name AS teamName, 
+           d.name AS department_name
     FROM users u
     LEFT JOIN teams t ON u.team_id = t.id
+    LEFT JOIN departments d ON u.department_id = d.id
     WHERE u.id = ?
     LIMIT 1
   `;
