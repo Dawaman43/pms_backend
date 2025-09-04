@@ -9,20 +9,20 @@ const Report = {
         u.jobTitle,
         d.name AS department,
         COALESCE((
-          SELECT JSON_ARRAYAGG(e.score)
+          SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
           WHERE e.user_id = u.id
             AND f.formType = 'peer_evaluation'
-            AND e.score IS NOT NULL
+            AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS peerScores,
         COALESCE((
-          SELECT JSON_ARRAYAGG(e.score)
+          SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
           WHERE e.user_id = u.id
             AND f.formType = 'self_assessment'
-            AND e.score IS NOT NULL
+            AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
@@ -40,20 +40,20 @@ const Report = {
         u.jobTitle,
         d.name AS department,
         COALESCE((
-          SELECT JSON_ARRAYAGG(e.score)
+          SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
           WHERE e.user_id = u.id
             AND f.formType = 'peer_evaluation'
-            AND e.score IS NOT NULL
+            AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS peerScores,
         COALESCE((
-          SELECT JSON_ARRAYAGG(e.score)
+          SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
           WHERE e.user_id = u.id
             AND f.formType = 'self_assessment'
-            AND e.score IS NOT NULL
+            AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
