@@ -177,10 +177,41 @@ const getAllEvaluations = (req, res, next) => {
   }
 };
 
+// ---------------------- Get Quarterly Performance ----------------------
+const getQuarterlyPerformance = (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (!userId) return res.status(400).json({ message: "User ID required" });
+
+    if (
+      !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view quarterly performance" });
+    }
+
+    Evaluation.getQuarterlyPerformance(userId, (err, results) => {
+      if (err) return next(err);
+
+      // Format: [{ quarter: "Q1", score: 75 }, ...]
+      const formatted = results.map((r) => ({
+        quarter: r.quarter,
+        score: parseFloat(r.avgScore) || 0,
+      }));
+
+      res.json(formatted);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   submitEvaluation,
   getEvaluationsByUser,
   getEvaluationById,
   updateEvaluation,
   getAllEvaluations,
+  getQuarterlyPerformance,
 };
