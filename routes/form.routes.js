@@ -14,6 +14,8 @@ const { verifyToken } = require("../middlewares/auth.middleware");
 const router = express.Router();
 
 // ------------------ MIDDLEWARE ------------------
+
+// Only admin or team_manager can create/update/delete forms
 const canManageForms = (req, res, next) => {
   if (["admin", "team_manager", "team_leader"].includes(req.userRole)) {
     return next();
@@ -21,18 +23,16 @@ const canManageForms = (req, res, next) => {
   return res.status(403).json({ message: "Access denied" });
 };
 
+// Only admin or team_manager can create forms
+const canCreateForm = (req, res, next) => {
+  if (["admin", "team_manager"].includes(req.userRole)) return next();
+  return res.status(403).json({ message: "Access denied" });
+};
+
 // ------------------ ROUTES ------------------
 
 // Create a form (admin or team_manager)
-router.post(
-  "/",
-  verifyToken,
-  (req, res, next) => {
-    if (["admin", "team_manager"].includes(req.userRole)) return next();
-    return res.status(403).json({ message: "Access denied" });
-  },
-  createForm
-);
+router.post("/", verifyToken, canCreateForm, createForm);
 
 // Get all forms (any authenticated user)
 router.get("/", verifyToken, getAllForms);

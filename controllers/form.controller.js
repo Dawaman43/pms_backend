@@ -36,53 +36,51 @@ const createForm = async (req, res) => {
       description = "",
       formType,
       targetEvaluator,
-      sections,
-      ratingScale,
+      criteria,
+      ratingScale = [],
       team_id = null,
-      period,
+      period_id,
     } = req.body;
 
-    if (!title || !formType || !targetEvaluator || !sections || !period)
+    // --- Required fields ---
+    if (!title || !formType || !targetEvaluator || !criteria || !period_id)
       return res
         .status(400)
         .json({ message: "All required fields must be provided" });
 
-    // --- Ensure total weight of all criteria = 100 ---
-    let totalWeight = 0;
-    sections.forEach((section) => {
-      if (!section.criteria || section.criteria.length === 0)
-        return res
-          .status(400)
-          .json({ message: "Each section must have at least one criterion" });
-
-      section.criteria.forEach((c) => {
-        totalWeight += parseFloat(c.weight || 0);
-      });
-    });
-    if (totalWeight !== 100)
+    if (!Array.isArray(criteria) || criteria.length === 0)
       return res
         .status(400)
-        .json({
-          message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
-        });
+        .json({ message: "At least one criterion is required" });
+
+    // --- Ensure total weight = 100 ---
+    const totalWeight = criteria.reduce(
+      (sum, c) => sum + parseFloat(c.weight || 0),
+      0
+    );
+    if (totalWeight !== 100)
+      return res.status(400).json({
+        message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
+      });
 
     const sql = `
       INSERT INTO evaluation_forms
-      (title, description, formType, targetEvaluator, weight, sections, ratingScale, team_id, created_by, lastModified, status, usageCount, period)
+      (title, description, formType, targetEvaluator, weight, criteria, ratingScale, team_id, created_by, lastModified, status, usageCount, period_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, ?)
     `;
+
     const params = [
       title,
       description,
       formType,
       targetEvaluator,
-      100, // form weight always 100%
-      JSON.stringify(sections),
-      JSON.stringify(ratingScale || []),
+      100, // total form weight fixed
+      JSON.stringify(criteria),
+      JSON.stringify(ratingScale),
       team_id,
       req.userId,
       new Date().toISOString().split("T")[0],
-      period,
+      period_id,
     ];
 
     const result = await queryAsync(sql, params);
@@ -102,7 +100,7 @@ const getAllForms = async (req, res) => {
     const results = await queryAsync(sql);
     const forms = results.map((f) => ({
       ...f,
-      sections: safeParseJSON(f.sections),
+      criteria: safeParseJSON(f.criteria),
       ratingScale: safeParseJSON(f.ratingScale),
     }));
     res.json(forms);
@@ -123,7 +121,7 @@ const getFormById = async (req, res) => {
 
     const form = {
       ...results[0],
-      sections: safeParseJSON(results[0].sections),
+      criteria: safeParseJSON(results[0].criteria),
       ratingScale: safeParseJSON(results[0].ratingScale),
     };
     res.json(form);
@@ -145,7 +143,7 @@ const getFormsByTeamId = async (req, res) => {
     const results = await queryAsync(sql, [numericTeamId]);
     const forms = results.map((f) => ({
       ...f,
-      sections: safeParseJSON(f.sections),
+      criteria: safeParseJSON(f.criteria),
       ratingScale: safeParseJSON(f.ratingScale),
     }));
     res.json(forms);
@@ -158,28 +156,27 @@ const getFormsByTeamId = async (req, res) => {
 // ==================== UPDATE FORM ====================
 const updateForm = async (req, res) => {
   try {
-    if (!["admin", "team_manager"].includes(req.userRole))
+    if (!["admin", "team_manager", "team_leader"].includes(req.userRole))
       return res
         .status(403)
         .json({ message: "Not authorized to update forms" });
 
-    const { sections, ratingScale, ...rest } = req.body;
+    const { criteria, ratingScale, ...rest } = req.body;
     const updateFields = {
       ...rest,
       lastModified: new Date().toISOString().split("T")[0],
     };
 
-    if (sections) {
-      let totalWeight = 0;
-      sections.forEach((section) => {
-        if (!section.criteria || section.criteria.length === 0)
-          return res
-            .status(400)
-            .json({ message: "Each section must have at least one criterion" });
-        section.criteria.forEach(
-          (c) => (totalWeight += parseFloat(c.weight || 0))
-        );
-      });
+    if (criteria) {
+      if (!Array.isArray(criteria) || criteria.length === 0)
+        return res
+          .status(400)
+          .json({ message: "At least one criterion is required" });
+
+      const totalWeight = criteria.reduce(
+        (sum, c) => sum + parseFloat(c.weight || 0),
+        0
+      );
       if (totalWeight !== 100)
         return res
           .status(400)
@@ -187,7 +184,7 @@ const updateForm = async (req, res) => {
             message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
           });
 
-      updateFields.sections = JSON.stringify(sections);
+      updateFields.criteria = JSON.stringify(criteria);
     }
 
     if (ratingScale) updateFields.ratingScale = JSON.stringify(ratingScale);
@@ -212,7 +209,7 @@ const updateForm = async (req, res) => {
 // ==================== DELETE FORM ====================
 const deleteForm = async (req, res) => {
   try {
-    if (!["admin", "team_manager"].includes(req.userRole))
+    if (!["admin", "team_manager", "team_leader"].includes(req.userRole))
       return res
         .status(403)
         .json({ message: "Not authorized to delete forms" });
@@ -237,7 +234,7 @@ const getAllPeerEvaluationForms = async (req, res) => {
     const results = await queryAsync(sql);
     const forms = results.map((f) => ({
       ...f,
-      sections: safeParseJSON(f.sections),
+      criteria: safeParseJSON(f.criteria),
       ratingScale: safeParseJSON(f.ratingScale),
     }));
     res.json(forms);
