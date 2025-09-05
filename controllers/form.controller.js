@@ -39,16 +39,22 @@ const createForm = async (req, res) => {
       sections,
       ratingScale,
       team_id = null,
+      period,
     } = req.body;
 
-    if (!title || !formType || !targetEvaluator || !sections)
+    if (!title || !formType || !targetEvaluator || !sections || !period)
       return res
         .status(400)
         .json({ message: "All required fields must be provided" });
 
-    // Ensure total weight of all criteria = 100
+    // --- Ensure total weight of all criteria = 100 ---
     let totalWeight = 0;
     sections.forEach((section) => {
+      if (!section.criteria || section.criteria.length === 0)
+        return res
+          .status(400)
+          .json({ message: "Each section must have at least one criterion" });
+
       section.criteria.forEach((c) => {
         totalWeight += parseFloat(c.weight || 0);
       });
@@ -56,24 +62,27 @@ const createForm = async (req, res) => {
     if (totalWeight !== 100)
       return res
         .status(400)
-        .json({ message: "Total criteria weight must equal 100%" });
+        .json({
+          message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
+        });
 
     const sql = `
       INSERT INTO evaluation_forms
-      (title, description, formType, targetEvaluator, weight, sections, ratingScale, team_id, created_by, lastModified, status, usageCount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)
+      (title, description, formType, targetEvaluator, weight, sections, ratingScale, team_id, created_by, lastModified, status, usageCount, period)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, ?)
     `;
     const params = [
       title,
       description,
       formType,
       targetEvaluator,
-      100, // total form weight fixed at 100%
+      100, // form weight always 100%
       JSON.stringify(sections),
       JSON.stringify(ratingScale || []),
       team_id,
       req.userId,
       new Date().toISOString().split("T")[0],
+      period,
     ];
 
     const result = await queryAsync(sql, params);
@@ -159,10 +168,14 @@ const updateForm = async (req, res) => {
       ...rest,
       lastModified: new Date().toISOString().split("T")[0],
     };
+
     if (sections) {
-      // Check total weight = 100
       let totalWeight = 0;
       sections.forEach((section) => {
+        if (!section.criteria || section.criteria.length === 0)
+          return res
+            .status(400)
+            .json({ message: "Each section must have at least one criterion" });
         section.criteria.forEach(
           (c) => (totalWeight += parseFloat(c.weight || 0))
         );
@@ -170,9 +183,13 @@ const updateForm = async (req, res) => {
       if (totalWeight !== 100)
         return res
           .status(400)
-          .json({ message: "Total criteria weight must equal 100%" });
+          .json({
+            message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
+          });
+
       updateFields.sections = JSON.stringify(sections);
     }
+
     if (ratingScale) updateFields.ratingScale = JSON.stringify(ratingScale);
 
     const setClause = Object.keys(updateFields)
