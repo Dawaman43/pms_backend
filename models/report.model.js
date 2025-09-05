@@ -1,6 +1,7 @@
 const db = require("../configs/db.config");
 
 const Report = {
+  // Generate a full performance report for all users
   generatePerformanceReport: (callback) => {
     const query = `
       SELECT
@@ -12,17 +13,13 @@ const Report = {
           SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
-          WHERE e.user_id = u.id
-            AND f.formType = 'peer_evaluation'
-            AND e.scores IS NOT NULL
+          WHERE e.user_id = u.id AND f.formType = 'peer_evaluation' AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS peerScores,
         COALESCE((
           SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
-          WHERE e.user_id = u.id
-            AND f.formType = 'self_assessment'
-            AND e.scores IS NOT NULL
+          WHERE e.user_id = u.id AND f.formType = 'self_assessment' AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
@@ -32,6 +29,7 @@ const Report = {
     db.query(query, callback);
   },
 
+  // Generate report for a single employee
   generateEmployeeReport: (employeeId, callback) => {
     const query = `
       SELECT
@@ -43,17 +41,13 @@ const Report = {
           SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
-          WHERE e.user_id = u.id
-            AND f.formType = 'peer_evaluation'
-            AND e.scores IS NOT NULL
+          WHERE e.user_id = u.id AND f.formType = 'peer_evaluation' AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS peerScores,
         COALESCE((
           SELECT JSON_ARRAYAGG(e.scores)
           FROM evaluations e
           JOIN evaluation_forms f ON e.form_id = f.id
-          WHERE e.user_id = u.id
-            AND f.formType = 'self_assessment'
-            AND e.scores IS NOT NULL
+          WHERE e.user_id = u.id AND f.formType = 'self_assessment' AND e.scores IS NOT NULL
         ), JSON_ARRAY()) AS selfScores,
         (SELECT COUNT(*) FROM evaluations ev WHERE ev.user_id = u.id) AS totalEvaluations
       FROM users u
@@ -61,6 +55,19 @@ const Report = {
       WHERE u.id = ?;
     `;
     db.query(query, [employeeId], callback);
+  },
+
+  // Generate quarterly performance report for a single employee
+  generateQuarterlyReport: (employeeId, callback) => {
+    const sql = `
+      SELECT quarter, 
+             ROUND(AVG(JSON_EXTRACT(scores, '$[*].value')), 1) AS avgScore
+      FROM evaluations
+      WHERE user_id = ?
+      GROUP BY quarter
+      ORDER BY FIELD(quarter, 'Q1','Q2','Q3','Q4')
+    `;
+    db.query(sql, [employeeId], callback);
   },
 };
 
