@@ -1,59 +1,107 @@
 const Report = require("../models/report.model");
+const Evaluation = require("../models/evaluation.model");
+const EvaluationForm = require("../models/evaluationForm.model");
 
-// Generate full performance report (admin / team leader only)
-const generatePerformanceReport = (req, res, next) => {
-  if (!["admin", "team_leader"].includes(req.userRole)) {
-    return res
-      .status(403)
-      .json({ message: "Not authorized to generate full report" });
-  }
-
-  Report.generatePerformanceReport((err, results) => {
-    if (err) {
-      console.error("💥 Performance report SQL error:", err);
-      return res.status(500).json({ message: err.sqlMessage || err.message });
+// ---------------------- Generate Full Performance Report ----------------------
+const generatePerformanceReport = async (req, res, next) => {
+  try {
+    if (!["admin", "team_leader"].includes(req.userRole)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to generate full report" });
     }
 
-    const reports = results.map((r) => ({
-      employeeId: r.employeeId,
-      employeeName: r.employeeName,
-      jobTitle: r.jobTitle,
-      department: r.department || "N/A",
-      totalEvaluations: r.totalEvaluations || 0,
-      peerScores: r.peerScores || [],
-      selfScores: r.selfScores || [],
-    }));
+    // Fetch all employees' evaluations
+    Report.generatePerformanceReport(async (err, results) => {
+      if (err) {
+        console.error("💥 Performance report SQL error:", err);
+        return res.status(500).json({ message: err.sqlMessage || err.message });
+      }
 
-    res.json(reports);
-  });
+      const reports = await Promise.all(
+        results.map(async (r) => {
+          // Fetch peer evaluations
+          const peerEvals = await Evaluation.findAllByUserAndFormType(
+            r.employeeId,
+            "peer_evaluation"
+          );
+          const selfEvals = await Evaluation.findAllByUserAndFormType(
+            r.employeeId,
+            "self_evaluation"
+          );
+
+          const peerScores = peerEvals.map((e) => e.totalScore || 0);
+          const selfScores = selfEvals.map((e) => e.totalScore || 0);
+
+          return {
+            employeeId: r.employeeId,
+            employeeName: r.employeeName,
+            jobTitle: r.jobTitle,
+            department: r.department || "N/A",
+            totalEvaluations: peerScores.length + selfScores.length,
+            peerScores,
+            selfScores,
+            averageScore: parseFloat(
+              (
+                (peerScores.reduce((a, b) => a + b, 0) +
+                  selfScores.reduce((a, b) => a + b, 0)) /
+                (peerScores.length + selfScores.length || 1)
+              ).toFixed(2)
+            ),
+          };
+        })
+      );
+
+      res.json(reports);
+    });
+  } catch (error) {
+    console.error("Unexpected error generating full report:", error);
+    next(error);
+  }
 };
 
-// Generate individual employee report
-const generateEmployeeReport = (req, res, next) => {
-  const employeeId = req.params.id;
+// ---------------------- Generate Individual Employee Report ----------------------
+const generateEmployeeReport = async (req, res, next) => {
+  try {
+    const employeeId = parseInt(req.params.id);
+    if (!employeeId)
+      return res.status(400).json({ message: "Employee ID required" });
 
-  if (!employeeId) {
-    return res.status(400).json({ message: "Employee ID required" });
-  }
-
-  // Staff can only access their own report
-  if (req.userRole === "staff" && req.userId != employeeId) {
-    return res
-      .status(403)
-      .json({ message: "Not authorized to view this report" });
-  }
-
-  Report.generateEmployeeReport(employeeId, (err, results) => {
-    if (err) {
-      console.error(`💥 Employee report SQL error for ID ${employeeId}:`, err);
-      return res.status(500).json({ message: err.sqlMessage || err.message });
+    // Staff can only access their own report
+    if (req.userRole === "staff" && req.userId !== employeeId) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view this report" });
     }
 
-    if (!results || results.length === 0) {
+    const employeeResults = await Report.generateEmployeeReport(employeeId);
+    if (!employeeResults || employeeResults.length === 0) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    const employee = results[0];
+    const employee = employeeResults[0];
+
+    // Fetch peer and self evaluations
+    const peerEvals = await Evaluation.findAllByUserAndFormType(
+      employeeId,
+      "peer_evaluation"
+    );
+    const selfEvals = await Evaluation.findAllByUserAndFormType(
+      employeeId,
+      "self_evaluation"
+    );
+
+    const peerScores = peerEvals.map((e) => e.totalScore || 0);
+    const selfScores = selfEvals.map((e) => e.totalScore || 0);
+
+    const totalEvaluations = peerScores.length + selfScores.length;
+    const averageScore = parseFloat(
+      (
+        (peerScores.reduce((a, b) => a + b, 0) +
+          selfScores.reduce((a, b) => a + b, 0)) /
+        (totalEvaluations || 1)
+      ).toFixed(2)
+    );
 
     res.json([
       {
@@ -61,12 +109,19 @@ const generateEmployeeReport = (req, res, next) => {
         employeeName: employee.employeeName,
         jobTitle: employee.jobTitle,
         department: employee.department || "N/A",
-        totalEvaluations: employee.totalEvaluations || 0,
-        peerScores: employee.peerScores || [],
-        selfScores: employee.selfScores || [],
+        totalEvaluations,
+        peerScores,
+        selfScores,
+        averageScore,
       },
     ]);
-  });
+  } catch (error) {
+    console.error(
+      `Unexpected error generating report for employee ${req.params.id}:`,
+      error
+    );
+    next(error);
+  }
 };
 
 module.exports = { generatePerformanceReport, generateEmployeeReport };

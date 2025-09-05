@@ -15,7 +15,6 @@ const safeParseJSON = (value, defaultValue = []) => {
   return Array.isArray(value) ? value : defaultValue;
 };
 
-// ==================== PROMISIFIED QUERY ====================
 const queryAsync = (sql, params = []) =>
   new Promise((resolve, reject) => {
     db.query(sql, params, (err, results) => {
@@ -37,19 +36,27 @@ const createForm = async (req, res) => {
       description = "",
       formType,
       targetEvaluator,
-      weight,
       sections,
       ratingScale,
       team_id = null,
     } = req.body;
-    const finalTeamId = formType === "peer_evaluation" ? null : team_id;
 
-    if (!title || !formType || !targetEvaluator || !weight || !sections)
+    if (!title || !formType || !targetEvaluator || !sections)
       return res
         .status(400)
         .json({ message: "All required fields must be provided" });
-    if (isNaN(parseInt(weight, 10)))
-      return res.status(400).json({ message: "Weight must be a number" });
+
+    // Ensure total weight of all criteria = 100
+    let totalWeight = 0;
+    sections.forEach((section) => {
+      section.criteria.forEach((c) => {
+        totalWeight += parseFloat(c.weight || 0);
+      });
+    });
+    if (totalWeight !== 100)
+      return res
+        .status(400)
+        .json({ message: "Total criteria weight must equal 100%" });
 
     const sql = `
       INSERT INTO evaluation_forms
@@ -61,10 +68,10 @@ const createForm = async (req, res) => {
       description,
       formType,
       targetEvaluator,
-      parseInt(weight, 10),
+      100, // total form weight fixed at 100%
       JSON.stringify(sections),
       JSON.stringify(ratingScale || []),
-      finalTeamId,
+      team_id,
       req.userId,
       new Date().toISOString().split("T")[0],
     ];
@@ -152,7 +159,20 @@ const updateForm = async (req, res) => {
       ...rest,
       lastModified: new Date().toISOString().split("T")[0],
     };
-    if (sections) updateFields.sections = JSON.stringify(sections);
+    if (sections) {
+      // Check total weight = 100
+      let totalWeight = 0;
+      sections.forEach((section) => {
+        section.criteria.forEach(
+          (c) => (totalWeight += parseFloat(c.weight || 0))
+        );
+      });
+      if (totalWeight !== 100)
+        return res
+          .status(400)
+          .json({ message: "Total criteria weight must equal 100%" });
+      updateFields.sections = JSON.stringify(sections);
+    }
     if (ratingScale) updateFields.ratingScale = JSON.stringify(ratingScale);
 
     const setClause = Object.keys(updateFields)

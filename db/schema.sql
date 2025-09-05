@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- ================= PERIODS =================
 CREATE TABLE IF NOT EXISTS periods (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name ENUM('Q1','Q2','Q3','Q4') NOT NULL,
+  name ENUM('Q1','Q2','Q3','Q4','Mid-Year','Year-End') NOT NULL,
   year INT NOT NULL,
   start_date DATE,
   end_date DATE,
@@ -64,9 +64,9 @@ CREATE TABLE IF NOT EXISTS evaluation_forms (
   description TEXT,
   formType ENUM('self_assessment','peer_evaluation') NOT NULL DEFAULT 'peer_evaluation',
   targetEvaluator VARCHAR(50) NOT NULL DEFAULT 'peer',
-  weight INT NOT NULL DEFAULT 100,
-  sections JSON NOT NULL,
-  ratingScale JSON NOT NULL,
+  weight INT NOT NULL DEFAULT 100, -- form total weight
+  sections JSON NOT NULL, -- array of sections {name, criteria:[{name, weight, maxScore}]}
+  ratingScale JSON NOT NULL, -- optional score levels for criteria
   team_id INT NULL,
   period_id INT NOT NULL,
   created_by INT,
@@ -85,7 +85,10 @@ CREATE TABLE IF NOT EXISTS evaluations (
   user_id INT NOT NULL,
   evaluator_id INT,
   form_id INT NOT NULL,
-  scores JSON,
+  scores JSON, -- {criterionId: score, ...}
+  calculated_points JSON, -- {criterionId: calculatedPoint, ...}
+  total_points DECIMAL(10,2), -- sum of calculated_points
+  average_points DECIMAL(10,2), -- average score
   comments TEXT,
   submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   period_id INT NOT NULL,
