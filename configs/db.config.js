@@ -8,23 +8,34 @@ const connection = mysql.createConnection({
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
   multipleStatements: true,
+  charset: "utf8mb4", // important for JSON
   typeCast: function (field, next) {
     const type = field.type;
     const name = field.name;
 
+    // JSON columns
     if (
       type === "JSON" ||
       name === "sections" ||
       name === "ratingScale" ||
-      name === "score" ||
+      name === "scores" ||
+      name === "criteria" || // add criteria here
       name === "data"
     ) {
-      const val = field.string();
+      const val = field.string("utf8"); // force utf8 decoding
       return val ? JSON.parse(val) : null;
     }
 
     return next();
   },
+});
+
+connection.connect((err) => {
+  if (err) {
+    console.error("❌ MySQL connection error:", err);
+  } else {
+    console.log("✅ Connected to MySQL database:", process.env.DB_NAME);
+  }
 });
 
 module.exports = connection;

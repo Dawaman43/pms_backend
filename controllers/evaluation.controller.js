@@ -16,50 +16,76 @@ const safeParseJSON = (value, defaultValue = []) => {
   return Array.isArray(value) ? value : defaultValue;
 };
 
-// ---------------------- Submit Evaluation ----------------------
+// ---------------------- SUBMIT EVALUATION ----------------------
 const submitEvaluation = (req, res, next) => {
   try {
     if (!["staff", "team_leader"].includes(req.userRole)) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to submit evaluations" });
+      return res.status(403).json({ message: "Not authorized" });
     }
 
-    const { user_id, form_id, scores, comments, period_id } = req.body;
-    if (!user_id || !form_id || !scores || Object.keys(scores).length === 0) {
+    let { user_id, form_id, scores, comments, period_id } = req.body;
+    console.log("Evaluation submission payload:", req.body);
+
+    if (!user_id || !form_id || !scores) {
       return res
         .status(400)
         .json({ message: "User ID, form ID, and scores are required" });
     }
 
-    // Pass data directly to the model
-    Evaluation.create(
-      {
-        user_id,
-        form_id,
-        scores,
-        comments,
-        evaluator_id: req.userId,
-        period_id,
-      },
-      (err, result) => {
-        if (err)
-          return res
-            .status(500)
-            .json({ message: err.message || "Error submitting evaluation" });
+    // Parse scores if they come as a string
+    if (typeof scores === "string") {
+      try {
+        scores = JSON.parse(scores);
+      } catch (err) {
+        return res.status(400).json({ message: "Invalid scores format" });
+      }
+    }
 
-        res.status(201).json({
-          message: "Evaluation submitted successfully",
-          evaluationId: result.insertId,
+    // Convert scores to numbers
+    const numericScores = {};
+    Object.keys(scores).forEach((key) => {
+      numericScores[key] = Number(scores[key]) || 0;
+    });
+
+    // ----------------- CALCULATE TOTAL & AVERAGE -----------------
+    const scoreValues = Object.values(numericScores);
+    const total_points = scoreValues.reduce((sum, val) => sum + val, 0);
+    const average_points =
+      scoreValues.length > 0 ? total_points / scoreValues.length : 0;
+
+    // Create evaluation data (without totalScore)
+    const evaluationData = {
+      user_id,
+      form_id,
+      evaluator_id: req.userId,
+      scores: JSON.stringify(numericScores),
+      total_points,
+      average_points,
+      comments,
+      period_id,
+      submitted_at: new Date(),
+    };
+
+    Evaluation.create(evaluationData, (err, result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          message: "Database error",
+          error: err.message,
         });
       }
-    );
+
+      res.status(201).json({
+        message: "Evaluation submitted successfully",
+        evaluationId: result.insertId,
+      });
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// ---------------------- Get Evaluations By User ----------------------
+// ---------------------- GET EVALUATIONS BY USER ----------------------
 const getEvaluationsByUser = (req, res, next) => {
   try {
     const requestedUserId = parseInt(req.params.userId);
@@ -86,7 +112,7 @@ const getEvaluationsByUser = (req, res, next) => {
   }
 };
 
-// ---------------------- Get Evaluation By ID ----------------------
+// ---------------------- GET EVALUATION BY ID ----------------------
 const getEvaluationById = (req, res, next) => {
   try {
     if (
@@ -113,7 +139,7 @@ const getEvaluationById = (req, res, next) => {
   }
 };
 
-// ---------------------- Update Evaluation ----------------------
+// ---------------------- UPDATE EVALUATION ----------------------
 const updateEvaluation = (req, res, next) => {
   try {
     if (!["team_manager", "admin"].includes(req.userRole)) {
@@ -124,7 +150,6 @@ const updateEvaluation = (req, res, next) => {
 
     const evaluationData = { ...req.body };
 
-    // Pass directly to model; model recalculates points if scores exist
     Evaluation.update(req.params.id, evaluationData, (err) => {
       if (err)
         return res
@@ -138,7 +163,7 @@ const updateEvaluation = (req, res, next) => {
   }
 };
 
-// ---------------------- Get All Evaluations ----------------------
+// ---------------------- GET ALL EVALUATIONS ----------------------
 const getAllEvaluations = (req, res, next) => {
   try {
     if (
@@ -164,7 +189,7 @@ const getAllEvaluations = (req, res, next) => {
   }
 };
 
-// ---------------------- Get Quarterly Performance ----------------------
+// ---------------------- GET QUARTERLY PERFORMANCE ----------------------
 const getQuarterlyPerformance = (req, res, next) => {
   try {
     const userId = parseInt(req.params.userId);

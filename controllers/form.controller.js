@@ -40,6 +40,7 @@ const createForm = async (req, res) => {
       ratingScale = [],
       team_id = null,
       period_id,
+      weight = 100, // ✅ allow custom form weight
     } = req.body;
 
     // --- Required fields ---
@@ -53,7 +54,7 @@ const createForm = async (req, res) => {
         .status(400)
         .json({ message: "At least one criterion is required" });
 
-    // --- Ensure total weight = 100 ---
+    // --- Ensure criteria sum = 100 ---
     const totalWeight = criteria.reduce(
       (sum, c) => sum + parseFloat(c.weight || 0),
       0
@@ -62,6 +63,12 @@ const createForm = async (req, res) => {
       return res.status(400).json({
         message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
       });
+
+    // --- Validate form weight ---
+    if (isNaN(weight) || weight <= 0)
+      return res
+        .status(400)
+        .json({ message: "Form weight must be a positive number" });
 
     const sql = `
       INSERT INTO evaluation_forms
@@ -74,7 +81,7 @@ const createForm = async (req, res) => {
       description,
       formType,
       targetEvaluator,
-      100, // total form weight fixed
+      weight, // ✅ use provided form weight
       JSON.stringify(criteria),
       JSON.stringify(ratingScale),
       team_id,
@@ -161,7 +168,7 @@ const updateForm = async (req, res) => {
         .status(403)
         .json({ message: "Not authorized to update forms" });
 
-    const { criteria, ratingScale, ...rest } = req.body;
+    const { criteria, ratingScale, weight, ...rest } = req.body;
     const updateFields = {
       ...rest,
       lastModified: new Date().toISOString().split("T")[0],
@@ -178,16 +185,22 @@ const updateForm = async (req, res) => {
         0
       );
       if (totalWeight !== 100)
-        return res
-          .status(400)
-          .json({
-            message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
-          });
+        return res.status(400).json({
+          message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
+        });
 
       updateFields.criteria = JSON.stringify(criteria);
     }
 
     if (ratingScale) updateFields.ratingScale = JSON.stringify(ratingScale);
+
+    if (weight) {
+      if (isNaN(weight) || weight <= 0)
+        return res
+          .status(400)
+          .json({ message: "Form weight must be a positive number" });
+      updateFields.weight = weight;
+    }
 
     const setClause = Object.keys(updateFields)
       .map((key) => `${key} = ?`)

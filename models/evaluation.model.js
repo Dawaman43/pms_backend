@@ -1,6 +1,6 @@
 const db = require("../configs/db.config");
 
-// Helper: Safely parse JSON
+// Helper: Safely parse JSON to array
 const safeParseJSON = (value, defaultValue = []) => {
   if (!value) return defaultValue;
   if (Buffer.isBuffer(value)) value = value.toString("utf8");
@@ -39,6 +39,10 @@ const calculatePoints = (criteriaList, scores) => {
   return {
     calculatedScores,
     totalPoints: parseFloat(totalPoints.toFixed(2)),
+    averagePoints:
+      criteriaList.length > 0
+        ? parseFloat((totalPoints / criteriaList.length).toFixed(2))
+        : 0,
   };
 };
 
@@ -47,9 +51,8 @@ const Evaluation = {
   create: (evaluationData, callback) => {
     const { form_id, scores } = evaluationData;
     if (!form_id || !scores)
-      return callback(new Error("Form ID and scores required"));
+      return callback(new Error("Form ID and scores are required"));
 
-    // Fetch the form's criteria
     db.query(
       "SELECT criteria, usageCount FROM evaluation_forms WHERE id = ?",
       [form_id],
@@ -61,20 +64,18 @@ const Evaluation = {
         const criteriaList = safeParseJSON(form.criteria, []);
 
         // Calculate points automatically
-        const { calculatedScores, totalPoints } = calculatePoints(
-          criteriaList,
-          scores
-        );
+        const { calculatedScores, totalPoints, averagePoints } =
+          calculatePoints(criteriaList, scores);
 
         // Prepare data to insert
         const finalEvaluation = {
           ...evaluationData,
           scores: JSON.stringify(calculatedScores),
-          totalScore: totalPoints,
+          total_points: totalPoints,
+          average_points: averagePoints,
           submitted_at: new Date(),
         };
 
-        // Insert evaluation
         db.query(
           "INSERT INTO evaluations SET ?",
           finalEvaluation,
@@ -103,7 +104,6 @@ const Evaluation = {
     const { form_id, scores } = evaluationData;
 
     if (scores && form_id) {
-      // Recalculate points if scores are provided
       db.query(
         "SELECT criteria FROM evaluation_forms WHERE id = ?",
         [form_id],
@@ -112,15 +112,14 @@ const Evaluation = {
           if (!results.length) return callback(new Error("Form not found"));
 
           const criteriaList = safeParseJSON(results[0].criteria, []);
-          const { calculatedScores, totalPoints } = calculatePoints(
-            criteriaList,
-            scores
-          );
+          const { calculatedScores, totalPoints, averagePoints } =
+            calculatePoints(criteriaList, scores);
 
           const finalEvaluation = {
             ...evaluationData,
             scores: JSON.stringify(calculatedScores),
-            totalScore: totalPoints,
+            total_points: totalPoints,
+            average_points: averagePoints,
           };
 
           db.query(
@@ -154,7 +153,7 @@ const Evaluation = {
 
   getQuarterlyPerformance: (userId, callback) => {
     const sql = `
-      SELECT QUARTER(submitted_at) AS quarter, AVG(totalScore) AS avgScore
+      SELECT QUARTER(submitted_at) AS quarter, AVG(total_points) AS avgScore
       FROM evaluations
       WHERE user_id = ?
       GROUP BY quarter
