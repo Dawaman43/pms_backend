@@ -1,135 +1,166 @@
 const db = require("../configs/db.config");
 
-// Helper: Calculate points based on form and submitted scores
-const calculateEvaluationPoints = (formSections, scores) => {
-  let totalWeight = 0;
-  let totalScore = 0;
+// Helper: Safely parse JSON
+const safeParseJSON = (value, defaultValue = []) => {
+  if (!value) return defaultValue;
+  if (Buffer.isBuffer(value)) value = value.toString("utf8");
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+  return Array.isArray(value) ? value : defaultValue;
+};
 
-  // Loop through each section and criterion
-  formSections.forEach((section) => {
-    section.criteria.forEach((criterion) => {
-      const score = scores[criterion.id] || 0; // score submitted
-      const weight = criterion.weight || 0;
+// Helper: Calculate total & weighted points based on criteria
+const calculatePoints = (criteriaList, scores) => {
+  let totalPoints = 0;
+  const calculatedScores = {};
 
-      totalScore += (score * weight) / 100; // weighted score
-      totalWeight += weight;
-    });
+  criteriaList.forEach((criterion) => {
+    const score = parseFloat(scores[criterion.id] || 0);
+    const maxScore = parseFloat(criterion.maxScore || 5);
+    const weight = parseFloat(criterion.weight || 0);
+    const points = (score / maxScore) * weight;
+
+    calculatedScores[criterion.id] = {
+      score,
+      maxScore,
+      weight,
+      points: parseFloat(points.toFixed(2)),
+    };
+
+    totalPoints += points;
   });
 
   return {
-    calculated_points: scores, // raw per-criterion scores
-    total_points: totalScore,
-    average_points: totalWeight ? totalScore / totalWeight : 0,
+    calculatedScores,
+    totalPoints: parseFloat(totalPoints.toFixed(2)),
   };
 };
 
 const Evaluation = {
   // Create a new evaluation
-  create: async (evaluationData, callback) => {
-    try {
-      // Fetch the form to validate weights and sections
+  create: (evaluationData, callback) => {
+    const { form_id, scores } = evaluationData;
+    if (!form_id || !scores)
+      return callback(new Error("Form ID and scores required"));
+
+    // Fetch the form's criteria
+    db.query(
+      "SELECT criteria, usageCount FROM evaluation_forms WHERE id = ?",
+      [form_id],
+      (err, results) => {
+        if (err) return callback(err);
+        if (!results.length) return callback(new Error("Form not found"));
+
+        const form = results[0];
+        const criteriaList = safeParseJSON(form.criteria, []);
+
+        // Calculate points automatically
+        const { calculatedScores, totalPoints } = calculatePoints(
+          criteriaList,
+          scores
+        );
+
+        // Prepare data to insert
+        const finalEvaluation = {
+          ...evaluationData,
+          scores: JSON.stringify(calculatedScores),
+          totalScore: totalPoints,
+          submitted_at: new Date(),
+        };
+
+        // Insert evaluation
+        db.query(
+          "INSERT INTO evaluations SET ?",
+          finalEvaluation,
+          (err, result) => {
+            if (err) return callback(err);
+
+            // Increment usage count on form
+            const newUsage = (form.usageCount || 0) + 1;
+            db.query(
+              "UPDATE evaluation_forms SET usageCount = ? WHERE id = ?",
+              [newUsage, form_id],
+              (err) => {
+                if (err) console.error("Failed to update usageCount:", err);
+              }
+            );
+
+            callback(null, result);
+          }
+        );
+      }
+    );
+  },
+
+  // Update an existing evaluation
+  update: (id, evaluationData, callback) => {
+    const { form_id, scores } = evaluationData;
+
+    if (scores && form_id) {
+      // Recalculate points if scores are provided
       db.query(
-        "SELECT sections, weight FROM evaluation_forms WHERE id = ?",
-        [evaluationData.form_id],
+        "SELECT criteria FROM evaluation_forms WHERE id = ?",
+        [form_id],
         (err, results) => {
           if (err) return callback(err);
           if (!results.length) return callback(new Error("Form not found"));
 
-          const form = results[0];
-          const sections = JSON.parse(form.sections);
+          const criteriaList = safeParseJSON(results[0].criteria, []);
+          const { calculatedScores, totalPoints } = calculatePoints(
+            criteriaList,
+            scores
+          );
 
-          // Validate that total weight of criteria = 100
-          let formTotalWeight = 0;
-          sections.forEach((section) => {
-            section.criteria.forEach((criterion) => {
-              formTotalWeight += criterion.weight || 0;
-            });
-          });
-          if (formTotalWeight !== 100) {
-            return callback(
-              new Error(
-                `Total weight of all criteria in the form is ${formTotalWeight}%, must be 100%`
-              )
-            );
-          }
-
-          // Calculate points
-          const scores = evaluationData.scores || {};
-          const points = calculateEvaluationPoints(sections, scores);
-
-          // Merge calculated points into evaluationData
           const finalEvaluation = {
             ...evaluationData,
-            scores: JSON.stringify(points.calculated_points),
-            total_points: points.total_points,
-            average_points: points.average_points,
+            scores: JSON.stringify(calculatedScores),
+            totalScore: totalPoints,
           };
 
-          // Insert evaluation into DB
-          db.query("INSERT INTO evaluations SET ?", finalEvaluation, callback);
+          db.query(
+            "UPDATE evaluations SET ? WHERE id = ?",
+            [finalEvaluation, id],
+            callback
+          );
         }
       );
-    } catch (error) {
-      callback(error);
+    } else {
+      // Update other fields without recalculating
+      db.query(
+        "UPDATE evaluations SET ? WHERE id = ?",
+        [evaluationData, id],
+        callback
+      );
     }
   },
 
-  // Find evaluations by user
-  findByUserId: (userId, callback) => {
-    db.query("SELECT * FROM evaluations WHERE user_id = ?", [userId], callback);
-  },
-
-  // Find evaluation by ID
   findById: (id, callback) => {
     db.query("SELECT * FROM evaluations WHERE id = ?", [id], callback);
   },
 
-  // Find all evaluations
+  findByUserId: (userId, callback) => {
+    db.query("SELECT * FROM evaluations WHERE user_id = ?", [userId], callback);
+  },
+
   findAll: (callback) => {
     db.query("SELECT * FROM evaluations", callback);
   },
 
-  // Update evaluation by ID
-  update: async (id, evaluationData, callback) => {
-    try {
-      // Fetch form if scores are being updated
-      if (evaluationData.scores) {
-        db.query(
-          "SELECT sections FROM evaluation_forms WHERE id = ?",
-          [evaluationData.form_id],
-          (err, results) => {
-            if (err) return callback(err);
-            if (!results.length) return callback(new Error("Form not found"));
-
-            const sections = JSON.parse(results[0].sections);
-            const scores = evaluationData.scores || {};
-
-            // Recalculate points
-            const points = calculateEvaluationPoints(sections, scores);
-            const finalEvaluation = {
-              ...evaluationData,
-              scores: JSON.stringify(points.calculated_points),
-              total_points: points.total_points,
-              average_points: points.average_points,
-            };
-
-            db.query(
-              "UPDATE evaluations SET ? WHERE id = ?",
-              [finalEvaluation, id],
-              callback
-            );
-          }
-        );
-      } else {
-        db.query(
-          "UPDATE evaluations SET ? WHERE id = ?",
-          [evaluationData, id],
-          callback
-        );
-      }
-    } catch (error) {
-      callback(error);
-    }
+  getQuarterlyPerformance: (userId, callback) => {
+    const sql = `
+      SELECT QUARTER(submitted_at) AS quarter, AVG(totalScore) AS avgScore
+      FROM evaluations
+      WHERE user_id = ?
+      GROUP BY quarter
+      ORDER BY quarter
+    `;
+    db.query(sql, [userId], callback);
   },
 };
 
