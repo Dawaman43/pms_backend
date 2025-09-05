@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
   level VARCHAR(255),
   email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  department_id INT,  -- now FK, not a string
+  department_id INT,
   team_id INT,
   phone VARCHAR(20),
   address TEXT,
@@ -72,9 +72,16 @@ CREATE TABLE IF NOT EXISTS evaluations (
   user_id INT NOT NULL,
   evaluator_id INT,
   form_id INT NOT NULL,
-  score JSON,
+  scores JSON,
   comments TEXT,
   submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  quarter ENUM('Q1','Q2','Q3','Q4') 
+      AS (CASE
+            WHEN MONTH(submitted_at) BETWEEN 1 AND 3 THEN 'Q1'
+            WHEN MONTH(submitted_at) BETWEEN 4 AND 6 THEN 'Q2'
+            WHEN MONTH(submitted_at) BETWEEN 7 AND 9 THEN 'Q3'
+            WHEN MONTH(submitted_at) BETWEEN 10 AND 12 THEN 'Q4'
+          END) STORED,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (form_id) REFERENCES evaluation_forms(id) ON DELETE CASCADE
