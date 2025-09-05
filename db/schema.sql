@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS users (
   FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
 );
 
+-- ================= PERIODS =================
+CREATE TABLE IF NOT EXISTS periods (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name ENUM('Q1','Q2','Q3','Q4') NOT NULL,
+  year INT NOT NULL,
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_period (name, year)
+);
+
 -- ================= EVALUATION FORMS =================
 CREATE TABLE IF NOT EXISTS evaluation_forms (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -57,13 +68,15 @@ CREATE TABLE IF NOT EXISTS evaluation_forms (
   sections JSON NOT NULL,
   ratingScale JSON NOT NULL,
   team_id INT NULL,
+  period_id INT NOT NULL,
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   lastModified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   status VARCHAR(50) NOT NULL DEFAULT 'active',
   usageCount INT NOT NULL DEFAULT 0,
   FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL,
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
 );
 
 -- ================= EVALUATIONS =================
@@ -75,16 +88,11 @@ CREATE TABLE IF NOT EXISTS evaluations (
   scores JSON,
   comments TEXT,
   submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  quarter ENUM('Q1','Q2','Q3','Q4') 
-      AS (CASE
-            WHEN MONTH(submitted_at) BETWEEN 1 AND 3 THEN 'Q1'
-            WHEN MONTH(submitted_at) BETWEEN 4 AND 6 THEN 'Q2'
-            WHEN MONTH(submitted_at) BETWEEN 7 AND 9 THEN 'Q3'
-            WHEN MONTH(submitted_at) BETWEEN 10 AND 12 THEN 'Q4'
-          END) STORED,
+  period_id INT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (form_id) REFERENCES evaluation_forms(id) ON DELETE CASCADE
+  FOREIGN KEY (form_id) REFERENCES evaluation_forms(id) ON DELETE CASCADE,
+  FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
 );
 
 -- ================= REPORTS =================
