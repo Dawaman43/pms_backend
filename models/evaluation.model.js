@@ -51,6 +51,17 @@ const Evaluation = {
     `;
     db.query(sql, [userId], callback);
   },
+
+  // Get evaluations filtered by period
+  findByPeriodId: (userId, periodId, callback) => {
+    const sql = `
+      SELECT * 
+      FROM evaluations
+      WHERE user_id = ? AND period_id = ?
+      ORDER BY submitted_at DESC
+    `;
+    db.query(sql, [userId, periodId], callback);
+  },
 };
 
 module.exports = Evaluation;
