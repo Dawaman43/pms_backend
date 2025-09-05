@@ -10,7 +10,7 @@ const submitEvaluation = async (req, res, next) => {
         .json({ message: "Not authorized to submit evaluations" });
     }
 
-    const { user_id, form_id, scores, comments } = req.body;
+    const { user_id, form_id, scores, comments, period_id } = req.body;
 
     if (!user_id || !form_id || !scores || Object.keys(scores).length === 0) {
       return res.status(400).json({
@@ -38,6 +38,7 @@ const submitEvaluation = async (req, res, next) => {
         scores: scoresJSON,
         comments: comments || "",
         submitted_at: new Date(),
+        period_id: period_id || null, // associate period if provided
       };
 
       Evaluation.create(evaluationData, (err, result) => {
@@ -83,7 +84,6 @@ const getEvaluationsByUser = (req, res, next) => {
         return next(new Error("Error fetching evaluations"));
       }
 
-      // No JSON.parse needed, scores already objects
       const evaluations = results.map((evaluation) => ({
         ...evaluation,
         scores: evaluation.scores || {},
@@ -114,7 +114,7 @@ const getEvaluationById = (req, res, next) => {
 
       const evaluation = {
         ...results[0],
-        scores: results[0].scores || {}, // already parsed
+        scores: results[0].scores || {},
       };
 
       res.json(evaluation);
