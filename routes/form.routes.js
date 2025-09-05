@@ -15,8 +15,9 @@ const router = express.Router();
 
 // ------------------ MIDDLEWARE ------------------
 const canManageForms = (req, res, next) => {
-  if (["admin", "team_manager", "team_leader"].includes(req.userRole))
+  if (["admin", "team_manager", "team_leader"].includes(req.userRole)) {
     return next();
+  }
   return res.status(403).json({ message: "Access denied" });
 };
 
