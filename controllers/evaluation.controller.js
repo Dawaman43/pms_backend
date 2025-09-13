@@ -220,7 +220,7 @@ const getQuarterlyPerformance = (req, res, next) => {
 
 const getLoggedUserQuarterlyReport = (req, res, next) => {
   try {
-    const userId = req.userId; // logged-in user ID
+    const userId = req.userId;
 
     if (
       !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
@@ -233,13 +233,11 @@ const getLoggedUserQuarterlyReport = (req, res, next) => {
     Evaluation.getQuarterlyPerformance(userId, (err, results) => {
       if (err) return next(err);
 
-      // Format results for dashboard
       const quarters = results.map((r) => ({
         quarter: r.quarter,
         avgScore: parseFloat(r.avgScore) || 0,
       }));
 
-      // Calculate summary stats
       const totalEvaluations = quarters.reduce(
         (sum, q) => sum + (q.avgScore > 0 ? 1 : 0),
         0
