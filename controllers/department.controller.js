@@ -2,7 +2,6 @@ const db = require("../configs/db.config");
 
 const Department = require("../models/department.model");
 
-// Create department (Admin only)
 const createDepartment = (req, res, next) => {
   if (req.userRole !== "admin") {
     return res
@@ -31,7 +30,6 @@ const getAllDepartments = (req, res, next) => {
   });
 };
 
-// Get department by ID (Admins only)
 const getDepartmentById = (req, res, next) => {
   if (req.userRole !== "admin") {
     return res.status(403).json({ message: "Admins only can view department" });
@@ -46,7 +44,6 @@ const getDepartmentById = (req, res, next) => {
   });
 };
 
-// Update department (Admins only)
 const updateDepartment = (req, res, next) => {
   if (req.userRole !== "admin") {
     return res
@@ -60,7 +57,6 @@ const updateDepartment = (req, res, next) => {
   });
 };
 
-// Delete department (Admins only)
 const deleteDepartment = (req, res, next) => {
   if (req.userRole !== "admin") {
     return res
@@ -98,7 +94,6 @@ const getTeamLeadersByDepartment = (req, res, next) => {
   });
 };
 
-// In department.controller.js
 const getStaffByDepartment = (req, res, next) => {
   if (req.userRole !== "admin") {
     return res.status(403).json({ message: "Admins only" });
