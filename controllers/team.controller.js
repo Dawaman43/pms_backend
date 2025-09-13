@@ -1,7 +1,6 @@
 const Team = require("../models/team.model");
 const db = require("../configs/db.config");
 
-// ================= CREATE TEAM =================
 const createTeam = (req, res, next) => {
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to create teams" });
@@ -64,7 +63,6 @@ const createTeam = (req, res, next) => {
   }
 };
 
-// ================= GET ALL TEAMS =================
 const getAllTeams = (req, res, next) => {
   const query = `
     SELECT t.id, t.name, t.description, t.created_at,
@@ -93,7 +91,6 @@ const getAllTeams = (req, res, next) => {
   });
 };
 
-// ================= GET TEAM BY ID =================
 const getTeamByIdResponse = (teamId, res) => {
   const query = `
     SELECT t.id, t.name, t.description, t.created_at,
@@ -126,7 +123,6 @@ const getTeamById = (req, res, next) => {
   getTeamByIdResponse(teamId, res);
 };
 
-// ================= UPDATE TEAM =================
 const updateTeam = (req, res, next) => {
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to update teams" });
@@ -157,7 +153,6 @@ const updateTeam = (req, res, next) => {
           );
         }
 
-        // Remove members no longer in team
         db.query(
           "UPDATE users SET team_id = NULL WHERE team_id = ? AND id NOT IN (?)",
           [teamId, memberIds],
@@ -166,8 +161,6 @@ const updateTeam = (req, res, next) => {
               return res
                 .status(500)
                 .json({ message: "Error removing old members" });
-
-            // Assign new members
             db.query(
               "UPDATE users SET team_id = ? WHERE id IN (?)",
               [teamId, memberIds],
@@ -202,7 +195,6 @@ const updateTeam = (req, res, next) => {
   } else updateTeamDB();
 };
 
-// ================= DELETE TEAM =================
 const deleteTeam = (req, res, next) => {
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to delete teams" });
@@ -225,7 +217,6 @@ const deleteTeam = (req, res, next) => {
   );
 };
 
-// ================= GET TEAM MEMBERS BY USER ID =================
 const getTeamMembersByUserId = (req, res, next) => {
   const userId = parseInt(req.params.userId);
   db.query(
@@ -259,9 +250,8 @@ const getTeamMembersByUserId = (req, res, next) => {
   );
 };
 
-// ================= GET MY TEAM MEMBERS (PEERS) =================
 const getMyTeamMembers = (req, res, next) => {
-  const userId = req.userId; // logged-in user
+  const userId = req.userId;
 
   db.query(
     "SELECT team_id FROM users WHERE id = ?",
@@ -300,15 +290,13 @@ const getMyTeamMembers = (req, res, next) => {
   );
 };
 
-// ================= GET TEAM MEMBERS (Leader/Admin only) =================
 const getTeamMembers = (req, res, next) => {
-  const userId = req.userId; // logged-in user
+  const userId = req.userId;
 
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to view members" });
   }
 
-  // Get team(s) where the logged-in user is the leader
   const teamQuery = `
     SELECT id AS team_id
     FROM teams
@@ -326,7 +314,6 @@ const getTeamMembers = (req, res, next) => {
 
     const teamIds = result.map((t) => t.team_id);
 
-    // Fetch all users assigned to the leader's team(s)
     const membersQuery = `
       SELECT 
         u.id,
