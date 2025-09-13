@@ -1,7 +1,6 @@
 const db = require("../configs/db.config");
 
 const Report = {
-  // Generate a full performance report for all users
   generatePerformanceReport: (callback) => {
     const query = `
       SELECT
@@ -33,7 +32,6 @@ const Report = {
     db.query(query, callback);
   },
 
-  // Generate report for a single employee
   generateEmployeeReport: (employeeId, callback) => {
     const query = `
       SELECT
@@ -65,7 +63,6 @@ const Report = {
     db.query(query, [employeeId], callback);
   },
 
-  // Generate quarterly performance report for a single employee
   generateQuarterlyReport: (employeeId, callback) => {
     const sql = `
       SELECT quarter, 
@@ -78,7 +75,6 @@ const Report = {
     db.query(sql, [employeeId], callback);
   },
 
-  // Generate performance report for a user filtered by period
   generateReportByPeriod: (employeeId, periodId, callback) => {
     const sql = `
       SELECT *
