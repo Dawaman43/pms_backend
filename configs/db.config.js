@@ -8,21 +8,20 @@ const connection = mysql.createConnection({
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
   multipleStatements: true,
-  charset: "utf8mb4", // important for JSON
+  charset: "utf8mb4",
   typeCast: function (field, next) {
     const type = field.type;
     const name = field.name;
 
-    // JSON columns
     if (
       type === "JSON" ||
       name === "sections" ||
       name === "ratingScale" ||
       name === "scores" ||
-      name === "criteria" || // add criteria here
+      name === "criteria" ||
       name === "data"
     ) {
-      const val = field.string("utf8"); // force utf8 decoding
+      const val = field.string("utf8");
       return val ? JSON.parse(val) : null;
     }
 
