@@ -2,7 +2,6 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/user.model");
 const db = require("../configs/db.config");
 
-// ================= REGISTER USER =================
 const register = (req, res, next) => {
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to create users" });
@@ -13,8 +12,8 @@ const register = (req, res, next) => {
     jobTitle,
     level,
     email,
-    team, // team name (optional)
-    department_id, // ✅ added
+    team,
+    department_id,
     phone,
     address,
     emergencyContact,
@@ -28,12 +27,10 @@ const register = (req, res, next) => {
     return next(new Error("Name, email, and password are required"));
   }
 
-  // Check if email exists
   User.findByEmail(email, (err, results) => {
     if (err) return next(new Error("Error checking email"));
     if (results.length > 0) return next(new Error("Email already exists"));
 
-    // Lookup team by name (optional)
     const getTeamId = (cb) => {
       if (!team) return cb(null, null);
       db.query(
@@ -80,7 +77,6 @@ const register = (req, res, next) => {
   });
 };
 
-// ================= GET ALL USERS =================
 const getAllUsers = (req, res, next) => {
   const { role } = req.query;
 
@@ -95,13 +91,11 @@ const getAllUsers = (req, res, next) => {
   `;
   const params = [];
 
-  // If staff, restrict to same team
   if (req.userRole === "staff") {
     query += " AND u.team_id = (SELECT team_id FROM users WHERE id = ?)";
     params.push(req.userId);
   }
 
-  // Filter by role if provided
   if (role) {
     query += " AND u.role = ?";
     params.push(role);
@@ -113,7 +107,6 @@ const getAllUsers = (req, res, next) => {
   });
 };
 
-// ================= GET USER BY ID =================
 const getUserById = (req, res, next) => {
   const userId = parseInt(req.params.id);
 
@@ -140,7 +133,6 @@ const getUserById = (req, res, next) => {
   });
 };
 
-// ================= UPDATE USER =================
 const updateUser = (req, res, next) => {
   const userId = parseInt(req.params.id);
 
@@ -197,7 +189,6 @@ const updateUser = (req, res, next) => {
   });
 };
 
-// ================= UPDATE PASSWORD =================
 const updatePassword = (req, res, next) => {
   const userId = parseInt(req.params.id);
 
@@ -241,8 +232,6 @@ const updatePassword = (req, res, next) => {
     });
   }
 };
-
-// ================= DELETE USER =================
 const deleteUser = (req, res, next) => {
   if (!["admin", "team_leader"].includes(req.userRole)) {
     return res.status(403).json({ message: "Not authorized to delete users" });
@@ -255,7 +244,6 @@ const deleteUser = (req, res, next) => {
   });
 };
 
-// ================= GET ALL USERS EXCEPT CURRENT =================
 const getAllUsersExceptCurrent = (req, res) => {
   db.query(
     "SELECT team_id FROM users WHERE id = ?",
