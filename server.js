@@ -18,10 +18,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: "https://pms-frontend-77qs.vercel.app/",
+    origin: "https://pms-frontend-77qs.vercel.app",
     credentials: true,
   })
 );
+
 app.use(bodyParser.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
