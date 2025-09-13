@@ -2,17 +2,14 @@ const db = require("../configs/db.config");
 const bcrypt = require("bcryptjs");
 
 const User = {
-  // Find user by email
   findByEmail: (email, callback) => {
     db.query("SELECT * FROM users WHERE email = ?", [email], callback);
   },
 
-  // Create a new user
   create: (userData, callback) => {
     db.query("INSERT INTO users SET ?", userData, callback);
   },
 
-  // Get all users with team and department names
   findAll: (callback) => {
     const query = `
       SELECT u.*, t.name AS teamName, d.name AS departmentName
@@ -23,7 +20,6 @@ const User = {
     db.query(query, callback);
   },
 
-  // Find a user by ID with team and department names
   findById: (id, callback) => {
     const query = `
       SELECT u.*, t.name AS teamName, d.name AS departmentName
@@ -36,12 +32,10 @@ const User = {
     db.query(query, [id], callback);
   },
 
-  // Find all team leaders
   findLeaders: (callback) => {
     db.query("SELECT * FROM users WHERE role = 'team_leader'", callback);
   },
 
-  // Find team leader by team ID
   findLeadersByTeamId: (teamId, callback) => {
     db.query(
       "SELECT * FROM users WHERE role = 'team_leader' AND team_id = ?",
@@ -50,13 +44,11 @@ const User = {
     );
   },
 
-  // Update user fields (except password)
   updateUser: (id, userData, callback) => {
     const { password, ...rest } = userData;
     db.query("UPDATE users SET ? WHERE id = ?", [rest, id], callback);
   },
 
-  // Update password with old password verification
   updatePassword: (id, oldPassword, newPassword, callback) => {
     db.query(
       "SELECT password FROM users WHERE id = ?",
@@ -80,7 +72,6 @@ const User = {
     );
   },
 
-  // Delete a user
   delete: (id, callback) => {
     db.query("DELETE FROM users WHERE id = ?", [id], callback);
   },
