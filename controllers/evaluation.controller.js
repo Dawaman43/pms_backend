@@ -1,7 +1,6 @@
 const Evaluation = require("../models/evaluation.model");
 const EvaluationForm = require("../models/evaluationForm.model");
 
-// ---------------------- UTILITIES ----------------------
 const safeParseJSON = (value, defaultValue = []) => {
   if (!value) return defaultValue;
   if (Buffer.isBuffer(value)) value = value.toString("utf8");
@@ -16,7 +15,6 @@ const safeParseJSON = (value, defaultValue = []) => {
   return Array.isArray(value) ? value : defaultValue;
 };
 
-// ---------------------- SUBMIT EVALUATION ----------------------
 const submitEvaluation = (req, res, next) => {
   try {
     if (!["staff", "team_leader"].includes(req.userRole)) {
@@ -32,7 +30,6 @@ const submitEvaluation = (req, res, next) => {
         .json({ message: "User ID, form ID, and scores are required" });
     }
 
-    // Parse scores if they come as a string
     if (typeof scores === "string") {
       try {
         scores = JSON.parse(scores);
@@ -41,19 +38,16 @@ const submitEvaluation = (req, res, next) => {
       }
     }
 
-    // Convert scores to numbers
     const numericScores = {};
     Object.keys(scores).forEach((key) => {
       numericScores[key] = Number(scores[key]) || 0;
     });
 
-    // ----------------- CALCULATE TOTAL & AVERAGE -----------------
     const scoreValues = Object.values(numericScores);
     const total_points = scoreValues.reduce((sum, val) => sum + val, 0);
     const average_points =
       scoreValues.length > 0 ? total_points / scoreValues.length : 0;
 
-    // Create evaluation data (without totalScore)
     const evaluationData = {
       user_id,
       form_id,
@@ -85,7 +79,6 @@ const submitEvaluation = (req, res, next) => {
   }
 };
 
-// ---------------------- GET EVALUATIONS BY USER ----------------------
 const getEvaluationsByUser = (req, res, next) => {
   try {
     const requestedUserId = parseInt(req.params.userId);
@@ -112,7 +105,6 @@ const getEvaluationsByUser = (req, res, next) => {
   }
 };
 
-// ---------------------- GET EVALUATION BY ID ----------------------
 const getEvaluationById = (req, res, next) => {
   try {
     if (
@@ -139,7 +131,6 @@ const getEvaluationById = (req, res, next) => {
   }
 };
 
-// ---------------------- UPDATE EVALUATION ----------------------
 const updateEvaluation = (req, res, next) => {
   try {
     if (!["team_manager", "admin"].includes(req.userRole)) {
@@ -163,7 +154,6 @@ const updateEvaluation = (req, res, next) => {
   }
 };
 
-// ---------------------- GET ALL EVALUATIONS ----------------------
 const getAllEvaluations = (req, res, next) => {
   try {
     if (
@@ -189,7 +179,6 @@ const getAllEvaluations = (req, res, next) => {
   }
 };
 
-// ---------------------- GET QUARTERLY PERFORMANCE ----------------------
 const getQuarterlyPerformance = (req, res, next) => {
   try {
     const userId = parseInt(req.params.userId);
