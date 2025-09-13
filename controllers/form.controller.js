@@ -1,6 +1,5 @@
 const db = require("../configs/db.config");
 
-// ==================== UTILITIES ====================
 const safeParseJSON = (value, defaultValue = []) => {
   if (!value) return defaultValue;
   if (Buffer.isBuffer(value)) value = value.toString("utf8");
@@ -23,7 +22,6 @@ const queryAsync = (sql, params = []) =>
     });
   });
 
-// ==================== CREATE FORM ====================
 const createForm = async (req, res) => {
   try {
     if (!["admin", "team_manager"].includes(req.userRole))
@@ -40,10 +38,9 @@ const createForm = async (req, res) => {
       ratingScale = [],
       team_id = null,
       period_id,
-      weight = 100, // ✅ allow custom form weight
+      weight = 100,
     } = req.body;
 
-    // --- Required fields ---
     if (!title || !formType || !targetEvaluator || !criteria || !period_id)
       return res
         .status(400)
@@ -54,7 +51,6 @@ const createForm = async (req, res) => {
         .status(400)
         .json({ message: "At least one criterion is required" });
 
-    // --- Ensure criteria sum = 100 ---
     const totalWeight = criteria.reduce(
       (sum, c) => sum + parseFloat(c.weight || 0),
       0
@@ -64,7 +60,6 @@ const createForm = async (req, res) => {
         message: `Total criteria weight must equal 100%. Currently: ${totalWeight}%`,
       });
 
-    // --- Validate form weight ---
     if (isNaN(weight) || weight <= 0)
       return res
         .status(400)
@@ -81,7 +76,7 @@ const createForm = async (req, res) => {
       description,
       formType,
       targetEvaluator,
-      weight, // ✅ use provided form weight
+      weight,
       JSON.stringify(criteria),
       JSON.stringify(ratingScale),
       team_id,
@@ -100,7 +95,6 @@ const createForm = async (req, res) => {
   }
 };
 
-// ==================== GET ALL FORMS ====================
 const getAllForms = async (req, res) => {
   try {
     const sql = "SELECT * FROM evaluation_forms WHERE status = 'active'";
@@ -117,7 +111,6 @@ const getAllForms = async (req, res) => {
   }
 };
 
-// ==================== GET FORM BY ID ====================
 const getFormById = async (req, res) => {
   try {
     const sql =
@@ -138,7 +131,6 @@ const getFormById = async (req, res) => {
   }
 };
 
-// ==================== GET FORMS BY TEAM ID ====================
 const getFormsByTeamId = async (req, res) => {
   const numericTeamId = parseInt(req.params.teamId, 10);
   if (isNaN(numericTeamId))
@@ -160,7 +152,6 @@ const getFormsByTeamId = async (req, res) => {
   }
 };
 
-// ==================== UPDATE FORM ====================
 const updateForm = async (req, res) => {
   try {
     if (!["admin", "team_manager", "team_leader"].includes(req.userRole))
@@ -219,7 +210,6 @@ const updateForm = async (req, res) => {
   }
 };
 
-// ==================== DELETE FORM ====================
 const deleteForm = async (req, res) => {
   try {
     if (!["admin", "team_manager", "team_leader"].includes(req.userRole))
@@ -239,7 +229,6 @@ const deleteForm = async (req, res) => {
   }
 };
 
-// ==================== GET ALL PEER EVALUATION FORMS ====================
 const getAllPeerEvaluationForms = async (req, res) => {
   try {
     const sql =
