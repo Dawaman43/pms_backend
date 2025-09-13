@@ -1,8 +1,6 @@
 const db = require("../configs/db.config");
 
-// Department Model
 const Department = {
-  // Create new department
   create: (data, callback) => {
     const { name, description } = data;
     db.query(
@@ -12,17 +10,14 @@ const Department = {
     );
   },
 
-  // Find all departments
   findAll: (callback) => {
     db.query("SELECT * FROM departments ORDER BY name ASC", callback);
   },
 
-  // Find by ID
   findById: (id, callback) => {
     db.query("SELECT * FROM departments WHERE id = ?", [id], callback);
   },
 
-  // Update department
   update: (id, data, callback) => {
     const { name, description } = data;
     db.query(
@@ -32,7 +27,6 @@ const Department = {
     );
   },
 
-  // Delete department
   delete: (id, callback) => {
     db.query("DELETE FROM departments WHERE id = ?", [id], callback);
   },

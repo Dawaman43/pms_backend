@@ -63,11 +63,9 @@ const Evaluation = {
         const form = results[0];
         const criteriaList = safeParseJSON(form.criteria, []);
 
-        // Calculate points automatically
         const { calculatedScores, totalPoints, averagePoints } =
           calculatePoints(criteriaList, scores);
 
-        // Prepare data to insert
         const finalEvaluation = {
           ...evaluationData,
           scores: JSON.stringify(calculatedScores),
@@ -130,7 +128,6 @@ const Evaluation = {
         }
       );
     } else {
-      // Update other fields without recalculating
       db.query(
         "UPDATE evaluations SET ? WHERE id = ?",
         [evaluationData, id],
@@ -151,15 +148,31 @@ const Evaluation = {
     db.query("SELECT * FROM evaluations", callback);
   },
 
+  // ---------------------- QUARTERLY PERFORMANCE ----------------------
   getQuarterlyPerformance: (userId, callback) => {
     const sql = `
-      SELECT QUARTER(submitted_at) AS quarter, AVG(total_points) AS avgScore
-      FROM evaluations
-      WHERE user_id = ?
-      GROUP BY quarter
-      ORDER BY quarter
+      SELECT p.name AS quarter, AVG(e.total_points) AS avgScore
+      FROM evaluations e
+      JOIN periods p ON e.period_id = p.id
+      WHERE e.user_id = ?
+      GROUP BY p.name
+      ORDER BY FIELD(p.name, 'Q1','Q2','Q3','Q4','Mid-Year','Year-End')
     `;
-    db.query(sql, [userId], callback);
+
+    db.query(sql, [userId], (err, results) => {
+      if (err) return callback(err);
+
+      const allQuarters = ["Q1", "Q2", "Q3", "Q4", "Mid-Year", "Year-End"];
+      const formatted = allQuarters.map((q) => {
+        const found = results.find((r) => r.quarter === q);
+        return {
+          quarter: q,
+          avgScore: found ? parseFloat(found.avgScore) : 0,
+        };
+      });
+
+      callback(null, formatted);
+    });
   },
 };
 

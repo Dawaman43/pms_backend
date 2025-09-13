@@ -218,6 +218,47 @@ const getQuarterlyPerformance = (req, res, next) => {
   }
 };
 
+const getLoggedUserQuarterlyReport = (req, res, next) => {
+  try {
+    const userId = req.userId; // logged-in user ID
+
+    if (
+      !["staff", "team_leader", "team_manager", "admin"].includes(req.userRole)
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view your quarterly report" });
+    }
+
+    Evaluation.getQuarterlyPerformance(userId, (err, results) => {
+      if (err) return next(err);
+
+      // Format results for dashboard
+      const quarters = results.map((r) => ({
+        quarter: r.quarter,
+        avgScore: parseFloat(r.avgScore) || 0,
+      }));
+
+      // Calculate summary stats
+      const totalEvaluations = quarters.reduce(
+        (sum, q) => sum + (q.avgScore > 0 ? 1 : 0),
+        0
+      );
+      const overallAvg =
+        quarters.reduce((sum, q) => sum + q.avgScore, 0) / quarters.length;
+
+      res.json({
+        userId,
+        totalEvaluations,
+        overallAvg: parseFloat(overallAvg.toFixed(2)),
+        quarters,
+      });
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   submitEvaluation,
   getEvaluationsByUser,
@@ -225,4 +266,5 @@ module.exports = {
   updateEvaluation,
   getAllEvaluations,
   getQuarterlyPerformance,
+  getLoggedUserQuarterlyReport,
 };
