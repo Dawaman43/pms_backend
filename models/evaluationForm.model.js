@@ -1,7 +1,6 @@
 const db = require("../configs/db.config");
 
 const EvaluationForm = {
-  // Create a new evaluation form
   create: (formData, callback) => {
     if (!formData.period_id) {
       return callback(new Error("period_id is required"));
@@ -9,17 +8,14 @@ const EvaluationForm = {
     db.query("INSERT INTO evaluation_forms SET ?", formData, callback);
   },
 
-  // Fetch all evaluation forms
   findAll: (callback) => {
     db.query("SELECT * FROM evaluation_forms", callback);
   },
 
-  // Fetch a form by its ID
   findById: (id, callback) => {
     db.query("SELECT * FROM evaluation_forms WHERE id = ?", [id], callback);
   },
 
-  // Fetch forms by team ID (numeric check)
   findByTeamId: (teamId, callback) => {
     const numericTeamId = parseInt(teamId, 10);
     if (isNaN(numericTeamId)) {
@@ -29,7 +25,6 @@ const EvaluationForm = {
     db.query(sql, [numericTeamId], callback);
   },
 
-  // Fetch forms by team ID and period ID
   findByTeamAndPeriod: (teamId, periodId, callback) => {
     const numericTeamId = parseInt(teamId, 10);
     const numericPeriodId = parseInt(periodId, 10);
@@ -44,7 +39,6 @@ const EvaluationForm = {
     db.query(sql, [numericTeamId, numericPeriodId], callback);
   },
 
-  // Update form by ID
   update: (id, formData, callback) => {
     if (formData.period_id && isNaN(parseInt(formData.period_id, 10))) {
       return callback(new Error("Invalid period ID"));
@@ -56,12 +50,10 @@ const EvaluationForm = {
     );
   },
 
-  // Delete form by ID
   delete: (id, callback) => {
     db.query("DELETE FROM evaluation_forms WHERE id = ?", [id], callback);
   },
 
-  // Optional: Fetch forms along with their evaluations, grouped by team
   findWithEvaluationsByTeamId: (teamId, callback) => {
     const numericTeamId = parseInt(teamId, 10);
     if (isNaN(numericTeamId)) return callback(new Error("Invalid team ID"));
