@@ -2,7 +2,6 @@ const Report = require("../models/report.model");
 const Evaluation = require("../models/evaluation.model");
 const EvaluationForm = require("../models/evaluationForm.model");
 
-// ---------------------- Generate Full Performance Report ----------------------
 const generatePerformanceReport = async (req, res, next) => {
   try {
     if (!["admin", "team_leader"].includes(req.userRole)) {
@@ -11,7 +10,6 @@ const generatePerformanceReport = async (req, res, next) => {
         .json({ message: "Not authorized to generate full report" });
     }
 
-    // Fetch all employees' evaluations
     Report.generatePerformanceReport(async (err, results) => {
       if (err) {
         console.error("💥 Performance report SQL error:", err);
@@ -20,7 +18,6 @@ const generatePerformanceReport = async (req, res, next) => {
 
       const reports = await Promise.all(
         results.map(async (r) => {
-          // Fetch peer evaluations
           const peerEvals = await Evaluation.findAllByUserAndFormType(
             r.employeeId,
             "peer_evaluation"
@@ -60,14 +57,12 @@ const generatePerformanceReport = async (req, res, next) => {
   }
 };
 
-// ---------------------- Generate Individual Employee Report ----------------------
 const generateEmployeeReport = async (req, res, next) => {
   try {
     const employeeId = parseInt(req.params.id);
     if (!employeeId)
       return res.status(400).json({ message: "Employee ID required" });
 
-    // Staff can only access their own report
     if (req.userRole === "staff" && req.userId !== employeeId) {
       return res
         .status(403)
@@ -81,7 +76,6 @@ const generateEmployeeReport = async (req, res, next) => {
 
     const employee = employeeResults[0];
 
-    // Fetch peer and self evaluations
     const peerEvals = await Evaluation.findAllByUserAndFormType(
       employeeId,
       "peer_evaluation"
